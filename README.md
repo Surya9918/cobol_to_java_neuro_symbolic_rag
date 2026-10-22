@@ -1,0 +1,53 @@
+# cobol_to_java_neuro_symbolic_rag
+
+AST-Guided Neuro-Symbolic RAG COBOL → Java Migration System with Dual Memory (Vector + Graph) and Cross-Language Differential Verification.
+
+## Architecture & Features
+
+- **Dual Memory Retrieval**: Combines semantic vector search with knowledge graph traversals across AST hierarchies, paragraph call graphs, and copybook dependencies.
+- **Symbolic Analysis**: AST parser and dependency graph extraction for COBOL copybooks, data divisions, and procedural blocks.
+- **Cross-Language Differential Verification**: Compares output and precision across COBOL execution and compiled Java code with numeric tolerance checks and automated repair loops.
+- **Web Interface**: Interactive dashboard for uploading legacy COBOL corpora, inspecting AST graphs, managing migrations, and viewing benchmark reports.
+
+## Project Structure
+
+```
+cobol_to_java_neuro_symbolic_rag/
+├── backend/
+│   └── app/
+│       ├── config.py
+│       ├── db/
+│       ├── main.py
+│       ├── providers/
+│       ├── schemas/
+│       └── services/
+├── frontend/
+│   └── static/
+│       └── index.html
+├── sample_corpus/
+│   └── billing_system/
+│       ├── BILLING.cob
+│       ├── CUSTOMER.cpy
+│       ├── DISCOUNT.cob
+│       └── TAXCONFIG.cpy
+├── workspace/
+├── .env.example
+├── .gitignore
+└── README.md
+```
+
+## Setup & Running
+
+1. **Configure Environment**:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your LLM provider and API keys if needed
+   ```
+
+2. **Backend**:
+   ```bash
+   python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --reload
+   ```
+
+3. **Frontend**:
+   Open `frontend/static/index.html` in your browser or serve via the FastAPI backend at `http://localhost:8000/`.
