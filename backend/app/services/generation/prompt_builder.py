@@ -62,6 +62,7 @@ class TranslationPromptBuilder:
         prompt_parts.append("- Use package: `package com.migration;`")
         prompt_parts.append("- Use ONLY standard Java SE libraries (`java.math.*`, `java.util.*`, `java.lang.*`). Do NOT import external third-party libraries (no Jackson, Gson, or external libraries).")
         prompt_parts.append("- Use `java.math.BigDecimal` with RoundingMode.HALF_UP for fixed-point decimal arithmetic.")
+        prompt_parts.append("- For numeric formatting with DecimalFormat, use valid Java patterns such as `\"#,##0.00\"` or `\"0.00\"`. NEVER use raw COBOL edit masks (like `\"ZZZ,ZZ9.99\"`) directly in DecimalFormat, as 'Z' is illegal in Java and causes java.lang.IllegalArgumentException.")
         prompt_parts.append("- Implement `public Map<String, Object> execute(Map<String, Object> input)` returning the computed state variables.")
         prompt_parts.append("- In `public static void main(String[] args)`: parse CLI args key=value into input Map, call execute(input), print delimiter line `___RESULT_JSON___` and the JSON string of result.")
         prompt_parts.append("- Preserve exact calculation order and conditional branching.")

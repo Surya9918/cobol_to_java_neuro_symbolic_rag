@@ -874,7 +874,7 @@
         </div>
         <div>
           <label style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Max Repair Retries</label>
-          <input type="number" id="mig-max-repairs" value="3" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; margin-top: 4px;">
+          <input type="number" id="mig-max-repairs" value="1" min="0" max="5" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; margin-top: 4px;">
         </div>
       </div>
     </div>
@@ -1180,10 +1180,37 @@
     document.querySelectorAll(".nav-btn").forEach(el => el.classList.remove("active"));
     const sec = document.getElementById("tab-" + tabId);
     if (sec) sec.style.display = "block";
-    event.currentTarget.classList.add("active");
+    if (typeof event !== 'undefined' && event && event.currentTarget && event.currentTarget.classList) {
+      event.currentTarget.classList.add("active");
+    }
 
+    if (tabId === "migration") ensureMigrationSourceLoaded();
     if (tabId === "graph") renderGraph();
     if (tabId === "capabilities") loadCapabilityMatrix();
+  }
+
+  async function ensureMigrationSourceLoaded() {
+    if (!currentProjectId) return;
+    const curCode = document.getElementById("mig-cobol-code").textContent;
+    if (!curCode || curCode.includes("// COBOL source will appear here") || curCode.trim() === "") {
+      try {
+        const files = await safeFetchJson(`/api/projects/${currentProjectId}/files`);
+        if (files && files.length > 0) {
+          const src = files.find(f => f.file_type === 'SOURCE') || files[0];
+          const data = await safeFetchJson(`/api/projects/${currentProjectId}/files/${src.file_id}`);
+          if (data && data.content) {
+            document.getElementById("mig-cobol-code").textContent = data.content;
+            document.getElementById("mig-source-title").textContent = src.file_name;
+            const progMatch = data.content.match(/PROGRAM-ID\.\s+([A-Za-z0-9_-]+)/i);
+            if (progMatch) {
+              document.getElementById("mig-target-name").value = progMatch[1].trim();
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Error loading migration source:", e);
+      }
+    }
   }
 
   // Ingestion Subtabs
@@ -1930,14 +1957,13 @@
       showToast("Please select a project first", "error");
       return;
     }
+    await ensureMigrationSourceLoaded();
     const targetName = document.getElementById("mig-target-name").value;
     const targetMode = document.getElementById("mig-target-mode").value;
-    const maxRepairs = parseInt(document.getElementById("mig-max-repairs").value) || 3;
+    const maxRepairs = parseInt(document.getElementById("mig-max-repairs").value) || 1;
 
     setPipelineStep(5, "running");
-    setPipelineStep(6, "running");
-    setPipelineStep(7, "running");
-    document.getElementById("mig-java-status").textContent = "GENERATING (GEMINI)...";
+    document.getElementById("mig-java-status").textContent = "STARTING PIPELINE...";
     document.getElementById("mig-java-status").className = "tag tag-blue";
 
     showToast("Starting AST-Guided Migration with Gemini...", "info");
@@ -2117,13 +2143,49 @@
   }
 
   // SSE Live Stream
+  let currentEvtSource = null;
   function initSSE() {
     if (!currentProjectId) return;
-    const evtSource = new EventSource(`/api/projects/${currentProjectId}/stream`);
-    evtSource.onmessage = (e) => {
-      const data = JSON.parse(e.data);
-      setPipelineStep(data.phase_number, data.status.toLowerCase());
-      document.getElementById("pipeline-live-status").textContent = `${data.phase_name}: ${data.status}`;
+    if (currentEvtSource) {
+      currentEvtSource.close();
+      currentEvtSource = null;
+    }
+    currentEvtSource = new EventSource(`/api/projects/${currentProjectId}/stream`);
+    currentEvtSource.onmessage = (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        const st = (data.status || "").toLowerCase();
+        setPipelineStep(data.phase_number, st);
+        document.getElementById("pipeline-live-status").textContent = `${data.phase_name}: ${data.status}`;
+        
+        if (data.details && data.details.code) {
+          document.getElementById("mig-java-code").textContent = data.details.code;
+        }
+
+        const tag = document.getElementById("mig-java-status");
+        if (data.phase_number === 7 && data.status === "RUNNING") {
+          tag.textContent = "GENERATING (GEMINI)...";
+          tag.className = "tag tag-blue";
+        } else if (data.phase_number === 7 && data.status === "SUCCESS") {
+          tag.textContent = "GENERATED";
+          tag.className = "tag tag-blue";
+        } else if (data.phase_number === 8 && data.status === "RUNNING") {
+          tag.textContent = "COMPILING (JAVAC)...";
+          tag.className = "tag tag-purple";
+        } else if (data.phase_number === 8 && data.status === "SUCCESS") {
+          tag.textContent = "COMPILED";
+          tag.className = "tag tag-pass";
+        } else if (data.phase_number === 9 && data.status === "RUNNING") {
+          tag.textContent = "DIFF TESTING...";
+          tag.className = "tag tag-amber";
+        } else if (data.phase_number === 10 && data.status === "RUNNING") {
+          tag.textContent = "REPAIRING (GEMINI)...";
+          tag.className = "tag tag-amber";
+        } else if (data.phase_number === 11) {
+          tag.textContent = data.status === "SUCCESS" ? "VERIFIED" : "COMPLETED";
+          tag.className = data.status === "SUCCESS" ? "tag tag-pass" : "tag tag-amber";
+        }
+      } catch (_) {}
     };
   }
 

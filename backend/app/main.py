@@ -51,7 +51,7 @@ benchmark_runner = BenchmarkRunner(workspace_mgr)
 # In-memory event stream subscribers for live pipeline progress
 pipeline_subscribers: Dict[str, List[asyncio.Queue]] = {}
 
-async def emit_pipeline_event(project_id: str, phase_number: int, phase_name: str, status: str, message: str, details: Optional[Dict[str, Any]] = None):
+def emit_pipeline_event_sync(project_id: str, phase_number: int, phase_name: str, status: str, message: str, details: Optional[Dict[str, Any]] = None):
     data = {
         "phase_number": phase_number,
         "phase_name": phase_name,
@@ -61,7 +61,14 @@ async def emit_pipeline_event(project_id: str, phase_number: int, phase_name: st
     }
     if project_id in pipeline_subscribers:
         for q in pipeline_subscribers[project_id]:
-            await q.put(data)
+            try:
+                q.put_nowait(data)
+            except Exception:
+                pass
+
+async def emit_pipeline_event(project_id: str, phase_number: int, phase_name: str, status: str, message: str, details: Optional[Dict[str, Any]] = None):
+    emit_pipeline_event_sync(project_id, phase_number, phase_name, status, message, details)
+    await asyncio.sleep(0.01)
 
 # ----------------- PROJECTS & UPLOADS -----------------
 
@@ -270,7 +277,8 @@ async def migrate_code(project_id: str, req: MigrationRequest):
         await emit_pipeline_event(project_id, 5, "Retrieval", "RUNNING", f"Retrieving context for {req.target_name}...")
         cb_resolver = CopybookResolver([pdir / "copybooks", pdir / "source"])
         query_str = req.query or req.target_name
-        bundle = retriever.retrieve(
+        bundle = await asyncio.to_thread(
+            retriever.retrieve,
             project_id=project_id,
             query=query_str,
             top_k=req.top_k,
@@ -292,12 +300,12 @@ async def migrate_code(project_id: str, req: MigrationRequest):
 
         # 3. Java Generation
         await emit_pipeline_event(project_id, 7, "Java Generation", "RUNNING", "Generating target Java code with Gemini...")
-        trans_res = translator.translate(prompt)
-        await emit_pipeline_event(project_id, 7, "Java Generation", "SUCCESS", f"Generated Java class {trans_res['entry_point']}.")
+        trans_res = await asyncio.to_thread(translator.translate, prompt)
+        first_java_code = trans_res["files"][0].content if trans_res.get("files") else ""
+        await emit_pipeline_event(project_id, 7, "Java Generation", "SUCCESS", f"Generated Java class {trans_res['entry_point']}.", {"code": first_java_code})
 
         # 4. Verification & Repair Loop
-        await emit_pipeline_event(project_id, 8, "Compilation", "RUNNING", "Validating Java compilation...")
-        await emit_pipeline_event(project_id, 9, "Differential Testing", "RUNNING", "Executing original COBOL vs Java on test suites...")
+        await emit_pipeline_event(project_id, 8, "Compilation", "RUNNING", "Validating Java compilation with javac...")
 
         conn = get_connection()
         cursor = conn.cursor()
@@ -313,20 +321,25 @@ async def migrate_code(project_id: str, req: MigrationRequest):
             max_attempts=req.max_repair_attempts
         )
 
-        verif_report: VerificationReport = repair_orchestrator.execute_verification_and_repair(
+        def on_repair_event(phase_no: int, phase_name: str, status: str, msg: str, details: Optional[Dict[str, Any]] = None):
+            emit_pipeline_event_sync(project_id, phase_no, phase_name, status, msg, details)
+
+        verif_report: VerificationReport = await asyncio.to_thread(
+            repair_orchestrator.execute_verification_and_repair,
             target_name=req.target_name,
             context=bundle,
             initial_files=trans_res["files"],
             entry_point=trans_res["entry_point"],
             cobol_source=cobol_source,
-            baseline=req.baseline
+            baseline=req.baseline,
+            on_phase_event=on_repair_event
         )
 
         if verif_report.total_repair_attempts > 1:
             await emit_pipeline_event(project_id, 10, "Repair", "SUCCESS", f"Completed {verif_report.total_repair_attempts - 1} repair attempts.")
 
         final_msg = "Functional verification PASS (100% equivalence)." if verif_report.final_status == "VERIFIED" else "Verification FAILED."
-        await emit_pipeline_event(project_id, 11, "Final Verification", "SUCCESS" if verif_report.final_status == "VERIFIED" else "FAILED", final_msg)
+        await emit_pipeline_event(project_id, 11, "Final Verification", "SUCCESS" if verif_report.final_status == "VERIFIED" else "FAILED", final_msg, {"code": verif_report.attempts_history[-1].generated_code if verif_report.attempts_history else first_java_code})
 
         # Update Persisted Migration
         total_time = (time.time() - t_start) * 1000.0
