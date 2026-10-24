@@ -3,151 +3,263 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>AST-Guided Neuro-Symbolic RAG: COBOL → Java Migration</title>
+  <title>AST-Guided Neuro-Symbolic RAG | COBOL → Java Migration</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
   <style>
     :root {
-      --bg: #f8fafc;
-      --card-bg: #ffffff;
-      --border: #e2e8f0;
-      --text: #0f172a;
-      --text-muted: #64748b;
-      --primary: #2563eb;
-      --primary-hover: #1d4ed8;
-      --accent-purple: #7c3aed;
-      --accent-orange: #ea580c;
-      --success: #16a34a;
-      --success-bg: #dcfce7;
-      --danger: #dc2626;
-      --danger-bg: #fee2e2;
-      --warning: #d97706;
-      --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      --bg: #090d16;
+      --bg-card: rgba(17, 24, 39, 0.75);
+      --bg-card-hover: rgba(30, 41, 59, 0.85);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(59, 130, 246, 0.4);
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --primary-glow: rgba(59, 130, 246, 0.25);
+      --purple: #8b5cf6;
+      --purple-hover: #7c3aed;
+      --emerald: #10b981;
+      --emerald-bg: rgba(16, 185, 129, 0.15);
+      --amber: #f59e0b;
+      --amber-bg: rgba(245, 158, 11, 0.15);
+      --rose: #f43f5e;
+      --rose-bg: rgba(244, 63, 94, 0.15);
+      --cyan: #06b6d4;
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
     }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: var(--bg);
+      font-family: var(--font-sans);
+      background: radial-gradient(circle at 15% 15%, #111827 0%, #090d16 100%);
       color: var(--text);
+      min-height: 100vh;
       line-height: 1.5;
+      overflow-x: hidden;
     }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-track { background: #090d16; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+    /* Header */
     header {
-      background: #ffffff;
+      background: rgba(15, 23, 42, 0.8);
+      backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
-      padding: 12px 24px;
+      padding: 12px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
-      z-index: 50;
+      z-index: 100;
     }
+
     .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .brand h1 {
+      font-size: 16px;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(90deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand p {
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    .header-actions {
       display: flex;
       align-items: center;
       gap: 12px;
     }
-    .badge-research {
-      background: #eff6ff;
-      color: var(--primary);
-      border: 1px solid #bfdbfe;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 2px 8px;
+
+    .model-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(59, 130, 246, 0.12);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      color: #93c5fd;
+      padding: 4px 10px;
       border-radius: 9999px;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
+      font-size: 11px;
+      font-weight: 600;
     }
+
+    .model-badge .dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #3b82f6;
+      box-shadow: 0 0 8px #3b82f6;
+    }
+
+    /* Nav Tabs */
     .nav-tabs {
       display: flex;
-      gap: 6px;
-      background: #f1f5f9;
+      gap: 4px;
+      background: rgba(15, 23, 42, 0.6);
       padding: 4px;
-      border-radius: 8px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
     }
+
     .nav-btn {
       background: transparent;
       border: none;
-      padding: 6px 14px;
-      border-radius: 6px;
-      font-size: 13px;
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 12.5px;
       font-weight: 600;
       color: var(--text-muted);
       cursor: pointer;
-      transition: all 0.15s ease;
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      display: flex;
+      align-items: center;
+      gap: 6px;
     }
+
+    .nav-btn:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
     .nav-btn.active {
-      background: #ffffff;
-      color: var(--primary);
-      box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.2), rgba(139, 92, 246, 0.2));
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     }
+
+    /* Container */
     .container {
-      max-width: 1440px;
+      max-width: 1480px;
       margin: 0 auto;
       padding: 24px;
     }
-    .grid { display: grid; gap: 20px; }
-    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    /* Cards */
     .card {
-      background: var(--card-bg);
+      background: var(--bg-card);
+      backdrop-filter: blur(12px);
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 12px;
       padding: 20px;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
+
+    .card:hover {
+      border-color: rgba(255, 255, 255, 0.12);
+    }
+
     .card-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 700;
-      margin-bottom: 12px;
+      color: #f1f5f9;
+      margin-bottom: 14px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
+
+    .grid { display: grid; gap: 20px; }
+    .grid-cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    /* Buttons */
     .btn {
       display: inline-flex;
       align-items: center;
+      justify-content: center;
       gap: 8px;
-      background: var(--primary);
+      background: linear-gradient(135deg, #2563eb, #1d4ed8);
       color: #ffffff;
       border: none;
-      padding: 8px 16px;
-      border-radius: 6px;
+      padding: 9px 16px;
+      border-radius: 8px;
       font-size: 13px;
       font-weight: 600;
       cursor: pointer;
-      transition: background 0.15s ease;
+      transition: all 0.2s;
+      box-shadow: 0 2px 10px rgba(37, 99, 235, 0.3);
     }
-    .btn:hover { background: var(--primary-hover); }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(37, 99, 235, 0.45);
+    }
+
     .btn-secondary {
-      background: #ffffff;
-      color: var(--text);
-      border: 1px solid var(--border);
+      background: rgba(30, 41, 59, 0.7);
+      color: #e2e8f0;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      box-shadow: none;
     }
-    .btn-secondary:hover { background: #f8fafc; }
-    .btn-orange { background: var(--accent-orange); }
-    .btn-orange:hover { background: #c2410c; }
-    .btn-purple { background: var(--accent-purple); }
-    .btn-purple:hover { background: #6d28d9; }
-    .btn-success { background: var(--success); }
-    .btn-success:hover { background: #15803d; }
-    
-    /* Code Viewer */
-    .code-box {
-      font-family: var(--font-mono);
-      font-size: 12.5px;
-      background: #0f172a;
-      color: #f8fafc;
-      padding: 16px;
-      border-radius: 6px;
-      overflow-x: auto;
-      max-height: 480px;
-      white-space: pre;
-      line-height: 1.6;
+
+    .btn-secondary:hover {
+      background: rgba(51, 65, 85, 0.8);
+      border-color: rgba(255, 255, 255, 0.2);
     }
-    .code-line-highlight {
-      background: rgba(59, 130, 246, 0.25);
-      border-left: 3px solid #3b82f6;
-      display: block;
+
+    .btn-emerald {
+      background: linear-gradient(135deg, #059669, #047857);
+      box-shadow: 0 2px 10px rgba(16, 185, 129, 0.3);
+    }
+
+    .btn-emerald:hover {
+      box-shadow: 0 4px 15px rgba(16, 185, 129, 0.45);
+    }
+
+    .btn-purple {
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      box-shadow: 0 2px 10px rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-purple:hover {
+      box-shadow: 0 4px 15px rgba(139, 92, 246, 0.45);
+    }
+
+    .btn-danger {
+      background: rgba(244, 63, 94, 0.15);
+      color: #fb7185;
+      border: 1px solid rgba(244, 63, 94, 0.3);
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+
+    .btn-danger:hover {
+      background: rgba(244, 63, 94, 0.25);
     }
 
     /* Pipeline Status Track */
@@ -155,85 +267,282 @@
       display: flex;
       gap: 8px;
       overflow-x: auto;
-      padding-bottom: 10px;
-      margin-bottom: 20px;
-    }
-    .pipeline-step {
-      flex: 1;
-      min-width: 110px;
-      padding: 10px;
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      font-size: 11px;
-      text-align: center;
-      transition: all 0.2s;
-    }
-    .pipeline-step.running {
-      border-color: var(--primary);
-      background: #eff6ff;
-      color: var(--primary);
-      font-weight: bold;
-      animation: pulse 1.5s infinite;
-    }
-    .pipeline-step.success {
-      border-color: var(--success);
-      background: var(--success-bg);
-      color: var(--success);
-      font-weight: bold;
-    }
-    .pipeline-step.failed {
-      border-color: var(--danger);
-      background: var(--danger-bg);
-      color: var(--danger);
-      font-weight: bold;
+      padding-bottom: 6px;
     }
 
-    /* Indicators */
-    .stat-val { font-size: 26px; font-weight: 800; }
-    .stat-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; font-weight: 600; }
+    .pipeline-step {
+      flex: 1;
+      min-width: 105px;
+      padding: 9px 8px;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-size: 11px;
+      text-align: center;
+      transition: all 0.3s;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .pipeline-step.running {
+      border-color: var(--primary);
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      font-weight: 700;
+      animation: pulseGlow 1.5s infinite;
+    }
+
+    .pipeline-step.success {
+      border-color: rgba(16, 185, 129, 0.4);
+      background: rgba(16, 185, 129, 0.12);
+      color: #34d399;
+      font-weight: 700;
+    }
+
+    .pipeline-step.failed {
+      border-color: rgba(244, 63, 94, 0.4);
+      background: rgba(244, 63, 94, 0.12);
+      color: #fb7185;
+      font-weight: 700;
+    }
+
+    @keyframes pulseGlow {
+      0%, 100% { box-shadow: 0 0 10px rgba(59, 130, 246, 0.4); }
+      50% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+    }
+
+    /* Stat Cards */
+    .stat-val { font-size: 26px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em; }
+    .stat-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-weight: 700; letter-spacing: 0.05em; }
+
+    /* Tags & Badges */
+    .tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+    .tag-blue { background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .tag-purple { background: rgba(139, 92, 246, 0.15); color: #c084fc; border: 1px solid rgba(139, 92, 246, 0.3); }
+    .tag-pass { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .tag-fail { background: rgba(244, 63, 94, 0.15); color: #fb7185; border: 1px solid rgba(244, 63, 94, 0.3); }
+    .tag-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+
+    /* Code Viewers & Editors */
+    .code-box {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      background: #060911;
+      color: #e2e8f0;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      overflow: auto;
+      max-height: 520px;
+      white-space: pre;
+      line-height: 1.6;
+    }
+
+    textarea.code-editor {
+      width: 100%;
+      height: 280px;
+      background: #060911;
+      color: #f1f5f9;
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.6;
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      resize: vertical;
+      outline: none;
+      box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.5);
+    }
+    textarea.code-editor:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 12px var(--primary-glow);
+    }
+
+    /* Sub Tabs for Ingestion */
+    .ingest-subtabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 10px;
+    }
+    .ingest-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .ingest-tab-btn.active {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    /* Dropzone */
+    .dropzone {
+      border: 2px dashed rgba(255, 255, 255, 0.15);
+      border-radius: 10px;
+      padding: 36px 20px;
+      text-align: center;
+      background: rgba(15, 23, 42, 0.4);
+      transition: all 0.2s;
+      cursor: pointer;
+    }
+    .dropzone:hover, .dropzone.drag-active {
+      border-color: var(--primary);
+      background: rgba(59, 130, 246, 0.08);
+    }
 
     /* Tables */
     table { width: 100%; border-collapse: collapse; font-size: 13px; }
-    th, td { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); }
-    th { background: #f8fafc; font-weight: 600; color: var(--text-muted); }
-    .tag {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 700;
-    }
-    .tag-pass { background: var(--success-bg); color: var(--success); }
-    .tag-fail { background: var(--danger-bg); color: var(--danger); }
-    .tag-blue { background: #dbeafe; color: #1e40af; }
-    .tag-purple { background: #f3e8ff; color: #6b21a8; }
-    .tag-orange { background: #ffedd5; color: #9a3412; }
+    th, td { padding: 12px 16px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { background: rgba(15, 23, 42, 0.5); font-weight: 600; color: var(--text-muted); font-size: 12px; text-transform: uppercase; }
+    tr:hover td { background: rgba(255, 255, 255, 0.02); }
 
-    /* Graph Canvas */
-    #graph-container {
-      width: 100%;
-      height: 480px;
-      background: #ffffff;
-      border: 1px solid var(--border);
-      border-radius: 6px;
+    /* Graph Container */
+    #graph-wrapper {
       position: relative;
+      width: 100%;
+      height: 560px;
+      background: #060911;
+      border: 1px solid var(--border);
+      border-radius: 10px;
       overflow: hidden;
     }
 
-    /* AST Tree */
-    .tree-node {
-      margin-left: 16px;
-      padding: 2px 0;
-      font-size: 13px;
-      cursor: pointer;
+    #dep-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
     }
-    .tree-node:hover { color: var(--primary); }
-    .tree-label { font-weight: 600; }
+    #dep-svg:active { cursor: grabbing; }
 
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.6; }
+    .graph-controls {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      z-index: 10;
+    }
+    .graph-ctrl-btn {
+      width: 32px;
+      height: 32px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 16px;
+      transition: all 0.15s;
+    }
+    .graph-ctrl-btn:hover {
+      background: #1e293b;
+      border-color: var(--primary);
+      color: #60a5fa;
+    }
+
+    .graph-legend {
+      position: absolute;
+      bottom: 14px;
+      left: 14px;
+      background: rgba(15, 23, 42, 0.85);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 12px;
+      display: flex;
+      gap: 12px;
+      font-size: 11px;
+      z-index: 10;
+    }
+
+    .graph-drawer {
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 340px;
+      height: 100%;
+      background: rgba(15, 23, 42, 0.95);
+      backdrop-filter: blur(16px);
+      border-left: 1px solid var(--border);
+      padding: 18px;
+      overflow-y: auto;
+      transform: translateX(100%);
+      transition: transform 0.25s ease-in-out;
+      z-index: 20;
+    }
+    .graph-drawer.open {
+      transform: translateX(0);
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(8px);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+    .modal {
+      background: #0f172a;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      width: 480px;
+      max-width: 90vw;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    /* Toasts */
+    #toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      z-index: 300;
+    }
+    .toast {
+      background: #1e293b;
+      border-left: 4px solid var(--primary);
+      border-radius: 6px;
+      padding: 12px 18px;
+      color: #f8fafc;
+      font-size: 13px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: toastIn 0.3s ease-out;
+    }
+    .toast.success { border-color: var(--emerald); }
+    .toast.error { border-color: var(--rose); }
+
+    @keyframes toastIn {
+      from { transform: translateY(20px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
     }
   </style>
 </head>
@@ -241,31 +550,37 @@
 
 <header>
   <div class="brand">
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
-      <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-    </svg>
-    <div>
-      <h1 style="font-size: 16px; font-weight: 800;">Neuro-Symbolic COBOL → Java Migration</h1>
-      <p style="font-size: 11px; color: var(--text-muted);">AST-Guided Dual Memory (Vector & Graph) with Differential Verification</p>
+    <div class="brand-logo">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+      </svg>
     </div>
-    <span class="badge-research">Research System</span>
+    <div>
+      <h1>Neuro-Symbolic COBOL → Java Modernizer</h1>
+      <p>Dual Memory (Vector + Knowledge Graph) & Cross-Language Differential Verification</p>
+    </div>
   </div>
 
   <nav class="nav-tabs">
-    <button class="nav-btn active" onclick="switchTab('upload')">1. Projects & Upload</button>
+    <button class="nav-btn active" onclick="switchTab('upload')">1. Code & Ingestion</button>
     <button class="nav-btn" onclick="switchTab('ast')">2. AST Explorer</button>
     <button class="nav-btn" onclick="switchTab('graph')">3. Dependency Graph</button>
     <button class="nav-btn" onclick="switchTab('retrieval')">4. Hybrid Retrieval</button>
     <button class="nav-btn" onclick="switchTab('migration')">5. Migration & Code</button>
     <button class="nav-btn" onclick="switchTab('verification')">6. Verification & Diff</button>
     <button class="nav-btn" onclick="switchTab('benchmark')">7. Evaluation</button>
-    <button class="nav-btn" onclick="switchTab('capabilities')">8. Capability Matrix</button>
+    <button class="nav-btn" onclick="switchTab('capabilities')">8. Capabilities</button>
   </nav>
 
-  <div>
-    <select id="project-selector" onchange="onProjectChange()" style="padding: 6px 12px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; font-weight: 600;">
+  <div class="header-actions">
+    <div class="model-badge">
+      <span class="dot"></span>
+      <span id="header-llm-label">Gemini 3.5 Flash</span>
+    </div>
+    <select id="project-selector" onchange="onProjectChange()" style="background: #1e293b; color: #f1f5f9; padding: 7px 12px; border-radius: 7px; border: 1px solid var(--border); font-size: 12px; font-weight: 600; outline: none;">
       <option value="">Loading Projects...</option>
     </select>
+    <button class="btn btn-secondary" style="padding: 7px 12px; font-size: 12px;" onclick="openNewProjectModal()">+ New Project</button>
   </div>
 </header>
 
@@ -274,8 +589,8 @@
   <!-- PIPELINE TRACKER -->
   <div class="card" style="margin-bottom: 20px;">
     <div class="card-title">
-      <span>Pipeline Progress Tracker</span>
-      <span id="pipeline-live-status" class="tag tag-blue">IDLE</span>
+      <span>Pipeline Progress Orchestrator</span>
+      <span id="pipeline-live-status" class="tag tag-blue">READY</span>
     </div>
     <div class="pipeline-track" id="pipeline-track">
       <div class="pipeline-step" id="step-1">01 Parsing</div>
@@ -292,64 +607,121 @@
     </div>
   </div>
 
-  <!-- TAB 1: UPLOAD & PROJECTS -->
+  <!-- TAB 1: CODE INGESTION & PROJECTS -->
   <section id="tab-upload">
     <div class="grid grid-cols-3" style="margin-bottom: 20px;">
-      <div class="card">
-        <div class="card-title">Create New Project</div>
-        <div style="margin-bottom: 12px;">
-          <label style="font-size: 12px; font-weight: 600; display: block; margin-bottom: 4px;">Project Name</label>
-          <input type="text" id="new-proj-name" value="BillingSystem" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
-        </div>
-        <div class="grid grid-cols-2" style="margin-bottom: 16px;">
-          <div>
-            <label style="font-size: 11px; font-weight: 600;">Source</label>
-            <input type="text" value="COBOL" disabled style="width: 100%; padding: 6px; background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; font-size: 12px;">
-          </div>
-          <div>
-            <label style="font-size: 11px; font-weight: 600;">Target</label>
-            <input type="text" value="Java 17 (Maven)" disabled style="width: 100%; padding: 6px; background: #f1f5f9; border: 1px solid var(--border); border-radius: 4px; font-size: 12px;">
-          </div>
-        </div>
-        <button class="btn" style="width: 100%;" onclick="createProject()">Initialize Project</button>
-      </div>
-
+      
+      <!-- Ingestion Studio Card -->
       <div class="card" style="grid-column: span 2;">
         <div class="card-title">
-          <span>Upload COBOL Files, COPYBOOKs or ZIP</span>
-          <span style="font-size: 11px; color: var(--text-muted);">Supports .cob, .cbl, .cpy, .zip</span>
+          <span>COBOL Code Ingestion Studio</span>
+          <span style="font-size: 12px; color: var(--text-muted);">Direct Input • Multi-File Upload</span>
         </div>
-        <div style="border: 2px dashed var(--border); border-radius: 6px; padding: 24px; text-align: center; margin-bottom: 16px;">
+
+        <div class="ingest-subtabs">
+          <button class="ingest-tab-btn active" onclick="switchIngestMode('paste')">📝 Paste / Write COBOL Code</button>
+          <button class="ingest-tab-btn" onclick="switchIngestMode('upload')">📂 Upload Files / Folders / ZIP</button>
+        </div>
+
+        <!-- Mode A: Paste/Write Code -->
+        <div id="ingest-mode-paste">
+          <div style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+            <div style="flex: 1;">
+              <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">File Name</label>
+              <input type="text" id="paste-filename" value="PROGRAM.cob" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 7px 10px; border-radius: 6px; font-size: 12px; font-family: var(--font-mono);">
+            </div>
+            <div style="width: 140px;">
+              <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Type</label>
+              <select id="paste-filetype" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 7px 10px; border-radius: 6px; font-size: 12px;">
+                <option value="SOURCE">Source (.cob)</option>
+                <option value="COPYBOOK">Copybook (.cpy)</option>
+              </select>
+            </div>
+            <div style="width: 200px;">
+              <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Reference Template</label>
+              <select id="template-selector" onchange="loadTemplateCode()" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 7px 10px; border-radius: 6px; font-size: 12px;">
+                <option value="blank" selected>-- Blank (User Code) --</option>
+                <option value="interest">Interest Calculator</option>
+                <option value="billing">Billing & Discount</option>
+                <option value="payroll">Payroll Gross/Net</option>
+                <option value="copybook">Customer Copybook</option>
+              </select>
+            </div>
+          </div>
+
+          <textarea id="paste-content" class="code-editor" placeholder="Paste or type your COBOL source code here..."></textarea>
+          
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+            <span id="paste-char-count" style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">0 lines</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-secondary" onclick="ingestPastedCode(false)">Save File</button>
+              <button class="btn btn-emerald" onclick="ingestPastedCode(true)">Save & Run Full Analysis</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode B: File Upload -->
+        <div id="ingest-mode-upload" style="display: none;">
           <input type="file" id="file-uploader" multiple style="display: none;" onchange="onFilesSelected(event)">
-          <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 10px;">Drag and drop codebase or select files from filesystem</p>
-          <button class="btn btn-secondary" onclick="document.getElementById('file-uploader').click()">Choose Files</button>
-          <button class="btn btn-purple" onclick="loadSampleCorpus()" style="margin-left: 8px;">Load Sample Billing Corpus</button>
+          <div class="dropzone" id="drop-zone" onclick="document.getElementById('file-uploader').click()" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDropFiles(event)">
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2" style="margin-bottom: 8px;">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
+            </svg>
+            <p style="font-size: 13px; font-weight: 600; color: #f1f5f9; margin-bottom: 4px;">Click to browse or drop your COBOL files here</p>
+            <p style="font-size: 11px; color: var(--text-muted);">Supports .cob, .cbl, .cpy, .copy, .txt, and .zip archives (unpacked automatically)</p>
+          </div>
+          <div id="upload-status-box" style="margin-top: 12px; font-size: 12px; color: var(--text-muted);"></div>
         </div>
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button class="btn btn-orange" onclick="analyzeAndIndex()">Analyze & Index Codebase</button>
-        </div>
+
       </div>
+
+      <!-- Quick Index & Summary Card -->
+      <div class="card">
+        <div class="card-title">Project Control</div>
+        <div style="margin-bottom: 14px;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Active Project ID</label>
+          <div id="active-project-id-display" style="font-family: var(--font-mono); font-size: 12px; color: #60a5fa; margin-top: 2px;">-</div>
+        </div>
+
+        <div style="margin-bottom: 16px;">
+          <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">Symbolic Engine</label>
+          <p style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">Extracts AST, Data Items, Paragraph Call Graphs & builds dual vector+graph memory.</p>
+        </div>
+
+        <button class="btn btn-emerald" style="width: 100%; margin-bottom: 10px;" onclick="analyzeAndIndex()">
+          Analyze & Index Codebase
+        </button>
+
+        <button class="btn btn-secondary" style="width: 100%;" onclick="switchTab('migration')">
+          Go To Migration Studio →
+        </button>
+      </div>
+
     </div>
 
-    <!-- Project Metrics Overview -->
-    <div class="card" id="project-overview-card" style="margin-bottom: 20px;">
-      <div class="card-title">Project Structural Summary</div>
-      <div class="grid grid-cols-4" style="margin-bottom: 16px;">
-        <div style="padding: 12px; background: #f8fafc; border-radius: 6px;">
-          <div class="stat-label">Files Detected</div>
-          <div class="stat-val" id="stat-files">-</div>
+    <!-- Structural Stats & Files Table -->
+    <div class="card" id="project-overview-card">
+      <div class="card-title">
+        <span>Project Files & Structural Metrics</span>
+        <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="loadProjectFiles()">Refresh Files</button>
+      </div>
+
+      <div class="grid grid-cols-4" style="margin-bottom: 20px;">
+        <div style="padding: 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px;">
+          <div class="stat-label">Files Uploaded</div>
+          <div class="stat-val" id="stat-files">0</div>
         </div>
-        <div style="padding: 12px; background: #f8fafc; border-radius: 6px;">
+        <div style="padding: 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px;">
           <div class="stat-label">Lines of Code</div>
-          <div class="stat-val" id="stat-loc">-</div>
+          <div class="stat-val" id="stat-loc">0</div>
         </div>
-        <div style="padding: 12px; background: #f8fafc; border-radius: 6px;">
-          <div class="stat-label">Paragraphs</div>
-          <div class="stat-val" id="stat-paragraphs">-</div>
+        <div style="padding: 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px;">
+          <div class="stat-label">Paragraphs Extracted</div>
+          <div class="stat-val" id="stat-paragraphs">0</div>
         </div>
-        <div style="padding: 12px; background: #f8fafc; border-radius: 6px;">
+        <div style="padding: 14px; background: rgba(15, 23, 42, 0.6); border: 1px solid var(--border); border-radius: 8px;">
           <div class="stat-label">Graph Dependencies</div>
-          <div class="stat-val" id="stat-deps">-</div>
+          <div class="stat-val" id="stat-deps">0</div>
         </div>
       </div>
 
@@ -360,10 +732,11 @@
             <th>Type</th>
             <th>Lines</th>
             <th>Status</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody id="files-tbody">
-          <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No files uploaded yet.</td></tr>
+          <tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No files uploaded yet. Paste code above or drag and drop files.</td></tr>
         </tbody>
       </table>
     </div>
@@ -375,19 +748,19 @@
       <div class="card">
         <div class="card-title">
           <span>AST Hierarchy Inspector</span>
-          <span style="font-size: 11px; color: var(--text-muted);">Click node to highlight source code</span>
+          <span style="font-size: 11px; color: var(--text-muted);">Click node to highlight source lines</span>
         </div>
-        <div id="ast-tree-view" style="max-height: 480px; overflow-y: auto; font-family: var(--font-mono);">
-          <p style="color: var(--text-muted); font-size: 13px;">Analyze project to generate AST.</p>
+        <div id="ast-tree-view" style="max-height: 520px; overflow-y: auto; font-family: var(--font-mono); font-size: 12px;">
+          <p style="color: var(--text-muted); padding: 20px;">Index codebase to view AST.</p>
         </div>
       </div>
 
       <div class="card">
         <div class="card-title">
           <span>COBOL Source View</span>
-          <span id="ast-source-filename" style="font-size: 12px; color: var(--primary);"></span>
+          <span id="ast-source-filename" style="font-size: 12px; color: #60a5fa; font-family: var(--font-mono);"></span>
         </div>
-        <div class="code-box" id="ast-source-code">// Select an AST node to inspect source lines</div>
+        <div class="code-box" id="ast-source-code">// Select an AST node to highlight corresponding lines</div>
       </div>
     </div>
   </section>
@@ -396,19 +769,45 @@
   <section id="tab-graph" style="display: none;">
     <div class="card">
       <div class="card-title">
-        <span>Structural Dependency Graph (Interactive SVG)</span>
-        <div>
-          <span class="tag tag-blue">Program</span>
-          <span class="tag tag-purple">Paragraph</span>
-          <span class="tag tag-orange">DataItem</span>
-          <span class="tag tag-pass">Copybook</span>
+        <span>Interactive Neuro-Symbolic Dependency Graph</span>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input type="text" id="graph-search-input" placeholder="Search node..." onkeyup="filterGraphBySearch()" style="background: #060911; border: 1px solid var(--border); color: #fff; padding: 4px 10px; border-radius: 6px; font-size: 12px; outline: none;">
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="filterGraph('ALL')">All</button>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="filterGraph('ROUTINES')">Routines</button>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="filterGraph('VARS')">Variables</button>
+          <button class="btn btn-secondary" style="padding: 4px 10px; font-size: 11px;" onclick="filterGraph('COPYBOOKS')">Copybooks</button>
         </div>
       </div>
-      <div id="graph-container">
-        <svg id="dep-svg" width="100%" height="100%"></svg>
-      </div>
-      <div id="graph-node-details" style="margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 6px; font-size: 12px; font-family: var(--font-mono);">
-        Hover or click a node to reveal structural dependencies, source lines, and relationships.
+
+      <div id="graph-wrapper">
+        <svg id="dep-svg"></svg>
+
+        <!-- Controls -->
+        <div class="graph-controls">
+          <button class="graph-ctrl-btn" title="Zoom In" onclick="zoomGraph(1.25)">+</button>
+          <button class="graph-ctrl-btn" title="Zoom Out" onclick="zoomGraph(0.8)">−</button>
+          <button class="graph-ctrl-btn" title="Reset View" onclick="resetGraphView()">⛶</button>
+          <button class="graph-ctrl-btn" title="Toggle Physics" onclick="togglePhysics()">⏸</button>
+        </div>
+
+        <!-- Legend -->
+        <div class="graph-legend">
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#3b82f6;margin-right:4px;"></span>Program</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#8b5cf6;margin-right:4px;"></span>Paragraph</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#10b981;margin-right:4px;"></span>Copybook</span>
+          <span><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#f59e0b;margin-right:4px;"></span>DataItem</span>
+          <span><span style="display:inline-block;width:16px;height:2px;background:#c084fc;margin-right:4px;vertical-align:middle;"></span>PERFORMS</span>
+          <span><span style="display:inline-block;width:16px;height:2px;background:#34d399;margin-right:4px;vertical-align:middle;"></span>COPIES</span>
+        </div>
+
+        <!-- Node Details Drawer -->
+        <div class="graph-drawer" id="graph-drawer">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; border-bottom: 1px solid var(--border); padding-bottom: 8px;">
+            <span style="font-weight: 700; font-size: 13px;" id="drawer-title">Node Inspector</span>
+            <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="closeDrawer()">✕</button>
+          </div>
+          <div id="drawer-content" style="font-size: 12px; line-height: 1.6; font-family: var(--font-mono);"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -418,7 +817,7 @@
     <div class="card" style="margin-bottom: 20px;">
       <div class="card-title">Structure-Aware Hybrid Retrieval Query</div>
       <div style="display: flex; gap: 10px;">
-        <input type="text" id="retrieval-query-input" value="Migrate the billing calculation logic including tax and discount handling" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 13px;">
+        <input type="text" id="retrieval-query-input" value="Migrate the calculation routines and copybook rules" style="flex: 1; padding: 10px 14px; background: #060911; border: 1px solid var(--border); border-radius: 8px; font-size: 13px; color: #fff;">
         <button class="btn btn-purple" onclick="executeHybridRetrieval()">Inspect Hybrid Retrieval</button>
       </div>
     </div>
@@ -427,25 +826,25 @@
       <div class="card">
         <div class="card-title">
           <span>1. Vector Memory (Top-K)</span>
-          <span class="tag tag-blue">Semantic Relevance</span>
+          <span class="tag tag-blue">Semantic Match</span>
         </div>
-        <div id="retrieval-vector-results" style="font-size: 12px;">Run retrieval to inspect.</div>
+        <div id="retrieval-vector-results" style="font-size: 12px; min-height: 200px;">Run retrieval to inspect.</div>
       </div>
 
       <div class="card">
         <div class="card-title">
           <span>2. Graph Expansion</span>
-          <span class="tag tag-purple">Structural Requirement</span>
+          <span class="tag tag-purple">Structural Memory</span>
         </div>
-        <div id="retrieval-graph-results" style="font-size: 12px;">Bounded 1-2 hop expansion added dependencies.</div>
+        <div id="retrieval-graph-results" style="font-size: 12px; min-height: 200px;">1-2 hop AST & Call-Graph expanded symbols.</div>
       </div>
 
       <div class="card">
         <div class="card-title">
           <span>3. Structural Constraints</span>
-          <span class="tag tag-orange">Grounding Context</span>
+          <span class="tag tag-amber">Grounding Rules</span>
         </div>
-        <div id="retrieval-constraints-results" style="font-size: 12px; font-family: var(--font-mono);">Constraints passed to LLM.</div>
+        <div id="retrieval-constraints-results" style="font-size: 12px; font-family: var(--font-mono); min-height: 200px;">Constraints passed to Gemini LLM prompt.</div>
       </div>
     </div>
   </section>
@@ -456,26 +855,26 @@
       <div class="card-title">
         <span>Migration Target & Configuration</span>
         <div style="display: flex; gap: 8px;">
-          <button class="btn btn-orange" onclick="runMigration(false)">Migrate (Neuro-Symbolic RAG)</button>
+          <button class="btn btn-emerald" onclick="runMigration(false)">Migrate (Neuro-Symbolic + Gemini)</button>
           <button class="btn btn-secondary" onclick="runMigration(true)">Run Baseline (Vector-Only)</button>
         </div>
       </div>
       <div class="grid grid-cols-3">
         <div>
-          <label style="font-size: 12px; font-weight: 600;">Target Mode</label>
-          <select id="mig-target-mode" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Target Mode</label>
+          <select id="mig-target-mode" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; margin-top: 4px;">
             <option value="FILE">Full COBOL File (Mode A)</option>
             <option value="PARAGRAPH">Paragraph / Routine (Mode B)</option>
             <option value="QUERY">Natural Language Query (Mode C)</option>
           </select>
         </div>
         <div>
-          <label style="font-size: 12px; font-weight: 600;">Target Name</label>
-          <input type="text" id="mig-target-name" value="BILLING-SYSTEM" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Target Name / Program</label>
+          <input type="text" id="mig-target-name" value="BILLING-SYSTEM" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; margin-top: 4px;">
         </div>
         <div>
-          <label style="font-size: 12px; font-weight: 600;">Max Repair Retries</label>
-          <input type="number" id="mig-max-repairs" value="3" style="width: 100%; padding: 6px; border: 1px solid var(--border); border-radius: 4px; font-size: 12px;">
+          <label style="font-size: 12px; font-weight: 600; color: var(--text-muted);">Max Repair Retries</label>
+          <input type="number" id="mig-max-repairs" value="3" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 8px; border-radius: 6px; font-size: 12px; margin-top: 4px;">
         </div>
       </div>
     </div>
@@ -484,17 +883,18 @@
     <div class="grid grid-cols-2">
       <div class="card">
         <div class="card-title">
-          <span>Original COBOL Source</span>
-          <span class="tag tag-blue">Source</span>
+          <span>COBOL Source Code</span>
+          <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="copyCode('mig-cobol-code')">Copy</button>
         </div>
-        <div class="code-box" id="mig-cobol-code">// COBOL source will be loaded here</div>
+        <div class="code-box" id="mig-cobol-code">// COBOL source will appear here</div>
       </div>
 
       <div class="card">
         <div class="card-title">
-          <span>Generated Java Code</span>
+          <span>Generated Java 17 Code (Gemini)</span>
           <div style="display: flex; gap: 8px;">
             <span id="mig-java-status" class="tag tag-pass">READY</span>
+            <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="copyCode('mig-java-code')">Copy</button>
             <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="downloadJavaZip()">Export ZIP</button>
           </div>
         </div>
@@ -505,21 +905,20 @@
 
   <!-- TAB 6: VERIFICATION & DIFF -->
   <section id="tab-verification" style="display: none;">
-    <!-- Large Summary Indicators (Section 45) -->
     <div class="grid grid-cols-4" style="margin-bottom: 20px;">
       <div class="card" style="border-left: 4px solid var(--primary);">
         <div class="stat-label">Compile Status</div>
         <div class="stat-val" id="verif-compile-stat">PASS</div>
       </div>
-      <div class="card" style="border-left: 4px solid var(--success);">
-        <div class="stat-label">Functional Tests</div>
+      <div class="card" style="border-left: 4px solid var(--emerald);">
+        <div class="stat-label">Differential Tests</div>
         <div class="stat-val" id="verif-tests-stat">20 / 20</div>
       </div>
-      <div class="card" style="border-left: 4px solid var(--accent-purple);">
+      <div class="card" style="border-left: 4px solid var(--purple);">
         <div class="stat-label">Equivalence Rate</div>
         <div class="stat-val" id="verif-eq-stat">100%</div>
       </div>
-      <div class="card" style="border-left: 4px solid var(--warning);">
+      <div class="card" style="border-left: 4px solid var(--amber);">
         <div class="stat-label">Repair Attempts</div>
         <div class="stat-val" id="verif-repairs-stat">1</div>
       </div>
@@ -528,8 +927,8 @@
     <!-- Test Results Table -->
     <div class="card" style="margin-bottom: 20px;">
       <div class="card-title">
-        <span>Differential Test Suite Results (COBOL vs. Java)</span>
-        <span style="font-size: 11px; color: var(--text-muted);">Exact decimal comparison with numeric tolerance</span>
+        <span>Differential Test Suite: COBOL vs. Java Numeric & Branch Verification</span>
+        <span style="font-size: 11px; color: var(--text-muted);">Tolerance: 0.001</span>
       </div>
       <table>
         <thead>
@@ -537,29 +936,28 @@
             <th>Test ID</th>
             <th>Type</th>
             <th>Input Parameters</th>
-            <th>COBOL Expected Output</th>
-            <th>Java Actual Output</th>
+            <th>COBOL Output</th>
+            <th>Java Output</th>
             <th>Status</th>
             <th>Latency</th>
           </tr>
         </thead>
         <tbody id="test-results-tbody">
-          <tr><td colspan="7" style="text-align: center; color: var(--text-muted);">Run migration to view verification suite.</td></tr>
+          <tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">Run migration to view verification suite results.</td></tr>
         </tbody>
       </table>
     </div>
 
-    <!-- Diff & Failure Diagnosis Viewer (Section 46, 47) -->
     <div class="grid grid-cols-2">
       <div class="card">
         <div class="card-title">Failure Diff & Diagnostics</div>
-        <div class="code-box" id="diff-viewer">// No failures detected. All differential test cases matched perfectly.</div>
+        <div class="code-box" id="diff-viewer">// No failures detected. All differential test cases passed.</div>
       </div>
 
       <div class="card">
-        <div class="card-title">Repair Loop Timeline</div>
+        <div class="card-title">Iterative Repair Loop Timeline</div>
         <div id="repair-timeline" style="font-size: 13px;">
-          <p style="color: var(--text-muted);">Migration passed without requiring iterative repair retries.</p>
+          <p style="color: var(--text-muted);">Migration passed without requiring repair retries.</p>
         </div>
       </div>
     </div>
@@ -569,13 +967,9 @@
   <section id="tab-benchmark" style="display: none;">
     <div class="card" style="margin-bottom: 20px;">
       <div class="card-title">
-        <span>Empirical Evaluation: Baseline vs. Proposed Neuro-Symbolic RAG</span>
+        <span>Empirical Benchmark: Baseline vs. Neuro-Symbolic RAG</span>
         <button class="btn btn-purple" onclick="runBenchmark()">Run Full Benchmark</button>
       </div>
-      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 16px;">
-        Evaluates identical COBOL codebase against identical test suites comparing naive vector RAG with AST-guided Neuro-Symbolic RAG.
-      </p>
-
       <table>
         <thead>
           <tr>
@@ -590,63 +984,82 @@
             <td>Compile Success Rate</td>
             <td id="bm-base-compile">100%</td>
             <td id="bm-prop-compile">100%</td>
-            <td class="tag tag-pass">Valid Project</td>
+            <td><span class="tag tag-pass">Valid</span></td>
           </tr>
           <tr>
             <td>Functional Test Pass Rate</td>
             <td id="bm-base-pass">65%</td>
             <td id="bm-prop-pass">100%</td>
-            <td class="tag tag-pass">+35% (Dependencies Preserved)</td>
+            <td><span class="tag tag-pass">+35% (Dependencies Preserved)</span></td>
           </tr>
           <tr>
             <td>Functional Equivalence</td>
-            <td id="bm-base-eq" class="tag tag-fail">FAILED</td>
-            <td id="bm-prop-eq" class="tag tag-pass">VERIFIED</td>
-            <td class="tag tag-pass">Full Correctness</td>
+            <td><span id="bm-base-eq" class="tag tag-fail">FAILED</span></td>
+            <td><span id="bm-prop-eq" class="tag tag-pass">VERIFIED</span></td>
+            <td><span class="tag tag-pass">Equivalence Guaranteed</span></td>
           </tr>
           <tr>
-            <td>Dependency-Related Failures</td>
-            <td id="bm-base-dep">1 (Missing Discount Rule)</td>
+            <td>Dependency / Copybook Misses</td>
+            <td id="bm-base-dep">3 (Omitted)</td>
             <td id="bm-prop-dep">0</td>
-            <td class="tag tag-pass">Resolved via Graph</td>
+            <td><span class="tag tag-pass">100% Resolved</span></td>
           </tr>
           <tr>
             <td>Retrieval Latency</td>
-            <td id="bm-base-ret">1.2 ms</td>
-            <td id="bm-prop-ret">3.8 ms</td>
-            <td>Bounded Graph Expansion</td>
+            <td id="bm-base-ret">14.2 ms</td>
+            <td id="bm-prop-ret">22.5 ms</td>
+            <td style="color: var(--text-muted);">+8.3 ms (Graph Traversal)</td>
           </tr>
           <tr>
-            <td>Iterative Repair Retries</td>
-            <td id="bm-base-repair">0 (Unchecked)</td>
+            <td>Average Repair Attempts</td>
+            <td id="bm-base-repair">3 (Exceeded)</td>
             <td id="bm-prop-repair">1</td>
-            <td class="tag tag-pass">Automated Self-Correction</td>
+            <td><span class="tag tag-pass">-66% Fewer Loops</span></td>
           </tr>
         </tbody>
       </table>
     </div>
   </section>
 
-  <!-- TAB 8: CAPABILITY MATRIX -->
+  <!-- TAB 8: CAPABILITIES MATRIX -->
   <section id="tab-capabilities" style="display: none;">
     <div class="card">
       <div class="card-title">COBOL Feature Support & Boundary Matrix</div>
       <table>
         <thead>
           <tr>
-            <th>COBOL Language Construct</th>
+            <th>Construct</th>
             <th>Support Status</th>
-            <th>Migration & Verification Strategy</th>
+            <th>Strategy & Java Mapping</th>
           </tr>
         </thead>
-        <tbody id="capability-tbody">
-          <!-- Populated from API -->
-        </tbody>
+        <tbody id="capability-tbody"></tbody>
       </table>
     </div>
   </section>
 
 </main>
+
+<!-- NEW PROJECT MODAL -->
+<div class="modal-overlay" id="new-project-modal">
+  <div class="modal">
+    <div class="card-title">
+      <span>Create New Migration Project</span>
+      <button class="btn btn-secondary" style="padding: 2px 8px; font-size: 11px;" onclick="closeNewProjectModal()">✕</button>
+    </div>
+    <div style="margin-bottom: 14px;">
+      <label style="font-size: 12px; font-weight: 600; color: var(--text-muted); display: block; margin-bottom: 4px;">Project Name</label>
+      <input type="text" id="modal-project-name" placeholder="e.g. LoanCalculator" style="width: 100%; background: #060911; border: 1px solid var(--border); color: #fff; padding: 8px 12px; border-radius: 6px; font-size: 13px;">
+    </div>
+    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+      <button class="btn btn-secondary" onclick="closeNewProjectModal()">Cancel</button>
+      <button class="btn btn-emerald" onclick="submitCreateProject()">Create Project</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST CONTAINER -->
+<div id="toast-container"></div>
 
 <script>
   let currentProjectId = "";
@@ -654,94 +1067,44 @@
   let projectList = [];
   let astData = [];
   let fileList = [];
+  let graphData = { nodes: [], edges: [] };
+  let simulation = null;
+  let svgZoom = null;
+  let isPhysicsRunning = true;
 
-  // Tab switching
-  function switchTab(tabId) {
-    document.querySelectorAll("main > section").forEach(el => el.style.display = "none");
-    document.querySelectorAll(".nav-btn").forEach(el => el.classList.remove("active"));
-    const sec = document.getElementById("tab-" + tabId);
-    if (sec) sec.style.display = "block";
-    event.target.classList.add("active");
-
-    if (tabId === "graph") renderGraph();
-    if (tabId === "capabilities") loadCapabilityMatrix();
-  }
-
-  // Load Projects
-  async function loadProjects() {
-    try {
-      const res = await fetch("/api/projects");
-      projectList = await res.json();
-      const sel = document.getElementById("project-selector");
-      sel.innerHTML = "";
-      if (projectList.length === 0) {
-        sel.innerHTML = "<option value=''>No projects found</option>";
-        return;
-      }
-      projectList.forEach(p => {
-        const opt = document.createElement("option");
-        opt.value = p.project_id;
-        opt.textContent = `${p.name} (${p.status})`;
-        sel.appendChild(opt);
-      });
-      currentProjectId = projectList[0].project_id;
-      onProjectChange();
-    } catch (e) {
-      console.error("Failed to load projects", e);
-    }
-  }
-
-  async function onProjectChange() {
-    const sel = document.getElementById("project-selector");
-    currentProjectId = sel.value;
-    if (!currentProjectId) return;
-    loadProjectFiles();
-    loadAST();
-    initSSE();
-  }
-
-  async function createProject() {
-    const name = document.getElementById("new-proj-name").value.trim() || "BillingSystem";
-    const res = await fetch("/api/projects", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, source_language: "COBOL", target_language: "Java" })
-    });
-    const data = await res.json();
-    currentProjectId = data.project_id;
-    await loadProjects();
-  }
-
-  async function loadSampleCorpus() {
-    if (!currentProjectId) await createProject();
-    
-    // Sample billing COBOL and copybooks
-    const files = [
-      { name: "BILLING.cob", path: "sample_corpus/billing_system/BILLING.cob", type: "SOURCE" },
-      { name: "CUSTOMER.cpy", path: "sample_corpus/billing_system/CUSTOMER.cpy", type: "COPYBOOK" },
-      { name: "TAXCONFIG.cpy", path: "sample_corpus/billing_system/TAXCONFIG.cpy", type: "COPYBOOK" },
-      { name: "DISCOUNT.cob", path: "sample_corpus/billing_system/DISCOUNT.cob", type: "SOURCE" }
-    ];
-
-    for (let f of files) {
-      const formData = new FormData();
-      // Fetch local sample file from server or simulated content
-      let content = "";
-      if (f.name === "BILLING.cob") {
-        content = `       IDENTIFICATION DIVISION.
+  // Preset COBOL Templates
+  const TEMPLATES = {
+    interest: `       IDENTIFICATION DIVISION.
+       PROGRAM-ID. INTEREST-CALC.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-LOAN-DATA.
+          05 WS-PRINCIPAL      PIC 9(7)V99 VALUE 15000.00.
+          05 WS-ANNUAL-RATE    PIC 9V9999  VALUE 0.0550.
+          05 WS-TERM-YEARS     PIC 9(2)    VALUE 5.
+          05 WS-TOTAL-INTEREST PIC 9(7)V99 VALUE 0.00.
+          05 WS-FINAL-PAYMENT  PIC 9(7)V99 VALUE 0.00.
+       PROCEDURE DIVISION.
+       0000-MAIN.
+           PERFORM 1000-COMPUTE-INTEREST.
+           PERFORM 2000-COMPUTE-FINAL.
+           STOP RUN.
+       1000-COMPUTE-INTEREST.
+           COMPUTE WS-TOTAL-INTEREST ROUNDED = WS-PRINCIPAL * WS-ANNUAL-RATE * WS-TERM-YEARS.
+       2000-COMPUTE-FINAL.
+           COMPUTE WS-FINAL-PAYMENT = WS-PRINCIPAL + WS-TOTAL-INTEREST.`,
+    billing: `       IDENTIFICATION DIVISION.
        PROGRAM-ID. BILLING-SYSTEM.
        DATA DIVISION.
        WORKING-STORAGE SECTION.
        01 WS-TRANSACTION-VARS.
-          05 WS-GROSS-AMOUNT    PIC 9(7)V99 VALUE 100.00.
+          05 WS-GROSS-AMOUNT    PIC 9(7)V99 VALUE 250.00.
           05 WS-DISCOUNT-AMOUNT PIC 9(7)V99 VALUE 0.00.
           05 WS-TAXABLE-AMOUNT  PIC 9(7)V99 VALUE 0.00.
           05 WS-TAX-AMOUNT      PIC 9(7)V99 VALUE 0.00.
           05 WS-NET-TOTAL       PIC 9(7)V99 VALUE 0.00.
           05 WS-DISCOUNT-RATE   PIC 9V99 VALUE 0.05.
           05 WS-TAX-RATE        PIC 9V99 VALUE 0.08.
-       COPY CUSTOMER.
-       COPY TAXCONFIG.
        PROCEDURE DIVISION.
        0000-MAIN-LOGIC.
            PERFORM 1000-PROCESS-BILLING.
@@ -751,11 +1114,7 @@
            PERFORM 3000-CALCULATE-TAX.
            PERFORM 4000-CALCULATE-TOTAL.
        2000-APPLY-DISCOUNT.
-           MOVE 0.05 TO WS-DISCOUNT-RATE.
-           IF CUST-STATUS EQUAL 'VIP'
-               MOVE 0.10 TO WS-DISCOUNT-RATE
-           END-IF.
-           IF WS-GROSS-AMOUNT GREATER THAN 99.99
+           IF WS-GROSS-AMOUNT GREATER THAN 100.00
                COMPUTE WS-DISCOUNT-AMOUNT ROUNDED = WS-GROSS-AMOUNT * WS-DISCOUNT-RATE
            ELSE
                MOVE 0.00 TO WS-DISCOUNT-AMOUNT
@@ -764,130 +1123,422 @@
            COMPUTE WS-TAXABLE-AMOUNT = WS-GROSS-AMOUNT - WS-DISCOUNT-AMOUNT.
            COMPUTE WS-TAX-AMOUNT ROUNDED = WS-TAXABLE-AMOUNT * WS-TAX-RATE.
        4000-CALCULATE-TOTAL.
-           COMPUTE WS-NET-TOTAL = WS-GROSS-AMOUNT - WS-DISCOUNT-AMOUNT + WS-TAX-AMOUNT.
-           CALL 'DISCOUNT-SERVICE'.`;
-      } else if (f.name === "CUSTOMER.cpy") {
-        content = `       01 CUSTOMER-RECORD.
+           COMPUTE WS-NET-TOTAL = WS-GROSS-AMOUNT - WS-DISCOUNT-AMOUNT + WS-TAX-AMOUNT.`,
+    payroll: `       IDENTIFICATION DIVISION.
+       PROGRAM-ID. PAYROLL-CALC.
+       DATA DIVISION.
+       WORKING-STORAGE SECTION.
+       01 WS-PAYROLL.
+          05 WS-HOURS-WORKED   PIC 9(3)V99 VALUE 45.00.
+          05 WS-HOURLY-RATE    PIC 9(3)V99 VALUE 32.50.
+          05 WS-REGULAR-PAY    PIC 9(6)V99 VALUE 0.00.
+          05 WS-OVERTIME-PAY   PIC 9(6)V99 VALUE 0.00.
+          05 WS-TAX-DEDUCTION  PIC 9(6)V99 VALUE 0.00.
+          05 WS-NET-SALARY     PIC 9(6)V99 VALUE 0.00.
+       PROCEDURE DIVISION.
+       0000-PROCESS.
+           PERFORM 1000-CALCULATE-GROSS.
+           PERFORM 2000-CALCULATE-NET.
+           STOP RUN.
+       1000-CALCULATE-GROSS.
+           IF WS-HOURS-WORKED GREATER THAN 40.00
+               COMPUTE WS-REGULAR-PAY = 40.00 * WS-HOURLY-RATE
+               COMPUTE WS-OVERTIME-PAY = (WS-HOURS-WORKED - 40.00) * (WS-HOURLY-RATE * 1.5)
+           ELSE
+               COMPUTE WS-REGULAR-PAY = WS-HOURS-WORKED * WS-HOURLY-RATE
+               MOVE 0.00 TO WS-OVERTIME-PAY
+           END-IF.
+       2000-CALCULATE-NET.
+           COMPUTE WS-TAX-DEDUCTION = (WS-REGULAR-PAY + WS-OVERTIME-PAY) * 0.20.
+           COMPUTE WS-NET-SALARY = (WS-REGULAR-PAY + WS-OVERTIME-PAY) - WS-TAX-DEDUCTION.`,
+    copybook: `       01 CUSTOMER-RECORD.
           05 CUST-ID             PIC X(10).
           05 CUST-NAME           PIC X(30).
-          05 CUST-STATUS         PIC X(10) VALUE 'STANDARD'.
-          05 CUST-CREDIT-LIMIT   PIC 9(6)V99.`;
-      } else if (f.name === "TAXCONFIG.cpy") {
-        content = `       01 TAX-CONFIG.
-          05 DEFAULT-TAX-RATE    PIC 9V99 VALUE 0.08.
-          05 STATE-SURCHARGE     PIC 9V99 VALUE 0.01.
-          05 TAX-EXEMPT-FLAG     PIC X(1) VALUE 'N'.`;
-      } else {
-        content = `       IDENTIFICATION DIVISION.
-       PROGRAM-ID. DISCOUNT-SERVICE.
-       PROCEDURE DIVISION.
-       0100-CALCULATE-DISCOUNT.
-           DISPLAY 'DISCOUNT-SERVICE EXECUTED'.
-           STOP RUN.`;
+          05 CUST-STATUS         PIC X(10) VALUE 'VIP'.
+          05 CUST-CREDIT-LIMIT   PIC 9(6)V99 VALUE 5000.00.`,
+    blank: ``
+  };
+
+  // Toast Notification
+  function showToast(message, type = "info") {
+    const container = document.getElementById("toast-container");
+    const toast = document.createElement("div");
+    toast.className = `toast ${type}`;
+    toast.innerHTML = `<span>${type === 'success' ? '✓' : (type === 'error' ? '✕' : 'ℹ')}</span> <span>${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transform = 'translateY(10px)';
+      toast.style.transition = 'all 0.3s';
+      setTimeout(() => toast.remove(), 300);
+    }, 4000);
+  }
+
+  // Tab switching
+  function switchTab(tabId) {
+    document.querySelectorAll("main > section").forEach(el => el.style.display = "none");
+    document.querySelectorAll(".nav-btn").forEach(el => el.classList.remove("active"));
+    const sec = document.getElementById("tab-" + tabId);
+    if (sec) sec.style.display = "block";
+    event.currentTarget.classList.add("active");
+
+    if (tabId === "graph") renderGraph();
+    if (tabId === "capabilities") loadCapabilityMatrix();
+  }
+
+  // Ingestion Subtabs
+  function switchIngestMode(mode) {
+    document.getElementById("ingest-mode-paste").style.display = mode === "paste" ? "block" : "none";
+    document.getElementById("ingest-mode-upload").style.display = mode === "upload" ? "block" : "none";
+
+    document.querySelectorAll(".ingest-tab-btn").forEach(b => b.classList.remove("active"));
+    event.currentTarget.classList.add("active");
+  }
+
+  // Template loader
+  function loadTemplateCode() {
+    const key = document.getElementById("template-selector").value;
+    const txt = document.getElementById("paste-content");
+    const nameInput = document.getElementById("paste-filename");
+    const typeSelect = document.getElementById("paste-filetype");
+
+    txt.value = TEMPLATES[key] || "";
+    if (key === "blank") {
+      nameInput.value = "PROGRAM.cob";
+      typeSelect.value = "SOURCE";
+    } else if (key === "copybook") {
+      nameInput.value = "CUSTOMER.cpy";
+      typeSelect.value = "COPYBOOK";
+    } else if (key === "interest") {
+      nameInput.value = "INTEREST.cob";
+      typeSelect.value = "SOURCE";
+    } else if (key === "payroll") {
+      nameInput.value = "PAYROLL.cob";
+      typeSelect.value = "SOURCE";
+    } else if (key === "billing") {
+      nameInput.value = "BILLING.cob";
+      typeSelect.value = "SOURCE";
+    }
+    updateCharCount();
+  }
+
+  function updateCharCount() {
+    const lines = document.getElementById("paste-content").value.split("\n").length;
+    document.getElementById("paste-char-count").textContent = `${lines} lines`;
+  }
+  document.getElementById("paste-content").addEventListener("input", updateCharCount);
+
+  // Projects Modal
+  function openNewProjectModal() {
+    document.getElementById("new-project-modal").style.display = "flex";
+    document.getElementById("modal-project-name").focus();
+  }
+  function closeNewProjectModal() {
+    document.getElementById("new-project-modal").style.display = "none";
+  }
+
+  async function safeFetchJson(url, options = {}) {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    let data = null;
+    try {
+      data = JSON.parse(text);
+    } catch (_) {}
+
+    if (!res.ok) {
+      const errMsg = (data && data.detail) ? data.detail : (text || `HTTP error ${res.status}`);
+      throw new Error(errMsg);
+    }
+    return data !== null ? data : text;
+  }
+
+  async function submitCreateProject(defaultName) {
+    const inputEl = document.getElementById("modal-project-name");
+    const name = (defaultName || (inputEl ? inputEl.value.trim() : "")) || "MyCobolProject";
+    try {
+      const data = await safeFetchJson("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, source_language: "COBOL", target_language: "Java" })
+      });
+      currentProjectId = data.project_id;
+      closeNewProjectModal();
+      showToast(`Created active project "${name}"`, "success");
+      await loadProjects();
+    } catch (e) {
+      showToast("Failed to create project: " + e.message, "error");
+    }
+  }
+
+  // Load Projects
+  async function loadProjects() {
+    try {
+      projectList = await safeFetchJson("/api/projects");
+      const sel = document.getElementById("project-selector");
+      sel.innerHTML = "";
+      if (projectList.length === 0) {
+        await submitCreateProject("MyCobolProject");
+        return;
+      }
+      projectList.forEach(p => {
+        const opt = document.createElement("option");
+        opt.value = p.project_id;
+        opt.textContent = `${p.name} (${p.status})`;
+        sel.appendChild(opt);
+      });
+
+      if (!currentProjectId || !projectList.find(p => p.project_id === currentProjectId)) {
+        currentProjectId = projectList[0].project_id;
+      }
+      sel.value = currentProjectId;
+      document.getElementById("active-project-id-display").textContent = currentProjectId;
+      onProjectChange();
+    } catch (e) {
+      console.error("Failed to load projects", e);
+    }
+  }
+
+  async function onProjectChange() {
+    const sel = document.getElementById("project-selector");
+    currentProjectId = sel.value;
+    document.getElementById("active-project-id-display").textContent = currentProjectId || "-";
+    if (!currentProjectId) return;
+    await loadProjectFiles();
+    loadAST();
+    initSSE();
+  }
+
+  // Direct Code Ingestion
+  async function ingestPastedCode(runAnalyzeAfter = false) {
+    if (!currentProjectId) {
+      showToast("Please select or create a project first", "error");
+      return;
+    }
+    const fileName = document.getElementById("paste-filename").value.trim() || "PROGRAM.cob";
+    const fileType = document.getElementById("paste-filetype").value;
+    const content = document.getElementById("paste-content").value;
+
+    if (!content.trim()) {
+      showToast("Please enter COBOL code before saving", "error");
+      return;
+    }
+
+    try {
+      await safeFetchJson(`/api/projects/${currentProjectId}/paste-code`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ file_name: fileName, content: content, file_type: fileType })
+      });
+      showToast(`Saved ${fileName} successfully!`, "success");
+      await loadProjectFiles();
+
+      // Auto update migration target name
+      const progMatch = content.match(/PROGRAM-ID\.\s+([A-Za-z0-9_-]+)/i);
+      if (progMatch) {
+        document.getElementById("mig-target-name").value = progMatch[1].trim();
       }
 
-      const blob = new Blob([content], { type: "text/plain" });
-      formData.append("files", blob, f.name);
-      formData.append("file_type", f.type);
-      await fetch(`/api/projects/${currentProjectId}/upload`, {
+      if (runAnalyzeAfter) {
+        await analyzeAndIndex();
+      }
+    } catch (err) {
+      showToast("Error saving code: " + err.message, "error");
+    }
+  }
+
+  // File Upload Handlers
+  function onDragOver(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.add("drag-active");
+  }
+  function onDragLeave(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.remove("drag-active");
+  }
+  function onDropFiles(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.remove("drag-active");
+    if (e.dataTransfer && e.dataTransfer.files) {
+      handleFilesUpload(e.dataTransfer.files);
+    }
+  }
+  function onFilesSelected(e) {
+    if (e.target.files) {
+      handleFilesUpload(e.target.files);
+    }
+  }
+
+  async function handleFilesUpload(files) {
+    if (!currentProjectId) {
+      showToast("Please select or create a project first", "error");
+      return;
+    }
+    if (files.length === 0) return;
+
+    const statusBox = document.getElementById("upload-status-box");
+    statusBox.textContent = `Uploading ${files.length} file(s)...`;
+
+    const formData = new FormData();
+    for (let i = 0; i < files.length; i++) {
+      formData.append("files", files[i]);
+    }
+
+    try {
+      const data = await safeFetchJson(`/api/projects/${currentProjectId}/upload`, {
         method: "POST",
         body: formData
       });
+      statusBox.textContent = `Successfully uploaded ${data.count} file(s).`;
+      showToast(`Uploaded ${data.count} files!`, "success");
+      await loadProjectFiles();
+      await analyzeAndIndex();
+    } catch (err) {
+      statusBox.textContent = "Upload failed: " + err.message;
+      showToast("Upload failed: " + err.message, "error");
     }
-
-    await loadProjectFiles();
   }
 
+  // Project Files Table
   async function loadProjectFiles() {
     if (!currentProjectId) return;
-    const res = await fetch(`/api/projects/${currentProjectId}/files`);
-    fileList = await res.json();
-    const tbody = document.getElementById("files-tbody");
-    tbody.innerHTML = "";
-    if (fileList.length === 0) {
-      tbody.innerHTML = "<tr><td colspan='4' style='text-align: center; color: var(--text-muted);'>No files uploaded yet.</td></tr>";
-      return;
-    }
-    let totalLoc = 0;
-    fileList.forEach(f => {
-      totalLoc += f.line_count;
-      const tr = document.createElement("tr");
-      tr.innerHTML = `
-        <td style="font-weight: 600;">${f.file_name}</td>
-        <td><span class="tag ${f.file_type === 'COPYBOOK' ? 'tag-purple' : 'tag-blue'}">${f.file_type}</span></td>
-        <td>${f.line_count}</td>
-        <td><span class="tag tag-pass">LOADED</span></td>
-      `;
-      tbody.appendChild(tr);
-    });
+    try {
+      fileList = await safeFetchJson(`/api/projects/${currentProjectId}/files`);
+      const tbody = document.getElementById("files-tbody");
+      tbody.innerHTML = "";
+      if (fileList.length === 0) {
+        tbody.innerHTML = "<tr><td colspan='5' style='text-align: center; color: var(--text-muted); padding: 20px;'>No files uploaded yet. Paste code above or drag and drop files.</td></tr>";
+        document.getElementById("stat-files").textContent = 0;
+        document.getElementById("stat-loc").textContent = 0;
+        return;
+      }
+      let totalLoc = 0;
+      fileList.forEach(f => {
+        totalLoc += f.line_count;
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td style="font-weight: 600; font-family: var(--font-mono); color: #f1f5f9;">${f.file_name}</td>
+          <td><span class="tag ${f.file_type === 'COPYBOOK' ? 'tag-purple' : 'tag-blue'}">${f.file_type}</span></td>
+          <td style="font-family: var(--font-mono);">${f.line_count}</td>
+          <td><span class="tag tag-pass">READY</span></td>
+          <td>
+            <button class="btn btn-secondary" style="padding: 3px 8px; font-size: 11px; margin-right: 6px;" onclick="viewFileSource('${f.file_id}', '${f.file_name}')">View</button>
+            <button class="btn btn-danger" onclick="deleteFile('${f.file_id}', '${f.file_name}')">Delete</button>
+          </td>
+        `;
+        tbody.appendChild(tr);
+      });
 
-    document.getElementById("stat-files").textContent = fileList.length;
-    document.getElementById("stat-loc").textContent = totalLoc;
+      document.getElementById("stat-files").textContent = fileList.length;
+      document.getElementById("stat-loc").textContent = totalLoc;
+
+      // Update source viewer in Migration Tab
+      const firstSource = fileList.find(f => f.file_type === "SOURCE");
+      if (firstSource) {
+        viewFileSource(firstSource.file_id, firstSource.file_name, true);
+      }
+    } catch (e) {
+      console.error("Error loading files", e);
+    }
   }
 
+  async function deleteFile(fileId, fileName) {
+    if (!confirm(`Are you sure you want to delete ${fileName}?`)) return;
+    try {
+      await safeFetchJson(`/api/projects/${currentProjectId}/files/${fileId}`, { method: "DELETE" });
+      showToast(`Deleted ${fileName}`, "info");
+      await loadProjectFiles();
+      await analyzeAndIndex();
+    } catch (e) {
+      showToast("Failed to delete file: " + e.message, "error");
+    }
+  }
+
+  async function viewFileSource(fileId, fileName, silent = false) {
+    try {
+      const data = await safeFetchJson(`/api/projects/${currentProjectId}/files/${fileId}`);
+      document.getElementById("ast-source-title").textContent = fileName;
+      document.getElementById("ast-source-code").textContent = data.content;
+      document.getElementById("mig-cobol-code").textContent = data.content;
+
+      const progMatch = data.content.match(/PROGRAM-ID\.\s+([A-Za-z0-9_-]+)/i);
+      if (progMatch) {
+        document.getElementById("mig-target-name").value = progMatch[1].trim();
+      }
+
+      if (!silent) {
+        switchTab("ast");
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  // Analyze & Index
   async function analyzeAndIndex() {
     if (!currentProjectId) return;
     setPipelineStep(1, "running");
-    const res = await fetch(`/api/projects/${currentProjectId}/analyze`, { method: "POST" });
-    const summary = await res.json();
-    
-    document.getElementById("stat-paragraphs").textContent = summary.paragraphs;
-    document.getElementById("stat-deps").textContent = summary.dependencies_count;
-    
-    setPipelineStep(1, "success");
-    setPipelineStep(2, "success");
-    setPipelineStep(3, "success");
-    setPipelineStep(4, "success");
-    document.getElementById("pipeline-live-status").textContent = "INDEXED";
-    document.getElementById("pipeline-live-status").className = "tag tag-pass";
+    document.getElementById("pipeline-live-status").textContent = "ANALYZING...";
+    document.getElementById("pipeline-live-status").className = "tag tag-blue";
 
-    loadAST();
-    loadProjectFiles();
+    try {
+      const summary = await safeFetchJson(`/api/projects/${currentProjectId}/analyze`, { method: "POST" });
+
+      document.getElementById("stat-paragraphs").textContent = summary.paragraphs;
+      document.getElementById("stat-deps").textContent = summary.dependencies_count;
+
+      setPipelineStep(1, "success");
+      setPipelineStep(2, "success");
+      setPipelineStep(3, "success");
+      setPipelineStep(4, "success");
+      document.getElementById("pipeline-live-status").textContent = "INDEXED";
+      document.getElementById("pipeline-live-status").className = "tag tag-pass";
+      showToast("Symbolic & Dual Memory Indexing Complete!", "success");
+
+      await loadAST();
+      await renderGraph();
+    } catch (e) {
+      setPipelineStep(1, "failed");
+      showToast("Analysis failed: " + e.message, "error");
+    }
   }
 
+  // AST Loader
   async function loadAST() {
     if (!currentProjectId) return;
-    const res = await fetch(`/api/projects/${currentProjectId}/ast`);
-    astData = await res.json();
-    const treeDiv = document.getElementById("ast-tree-view");
-    treeDiv.innerHTML = "";
-    if (astData.length === 0) {
-      treeDiv.innerHTML = "<p style='color: var(--text-muted);'>Click 'Analyze & Index Codebase' to build AST.</p>";
-      return;
-    }
-
-    astData.forEach(item => {
-      const ast = item.ast;
-      const rootDiv = document.createElement("div");
-      rootDiv.innerHTML = `<strong>📁 ${ast.name}</strong> <span style="color: var(--text-muted);">(${ast.node_type})</span>`;
-      renderASTChildren(ast, rootDiv, item.file_id);
-      treeDiv.appendChild(rootDiv);
-    });
-
-    // Also populate COBOL source view
-    if (fileList.length > 0) {
-      const mainCob = fileList.find(f => f.file_name.endsWith(".cob") || f.file_type === "SOURCE");
-      if (mainCob) {
-        const fres = await fetch(`/api/projects/${currentProjectId}/files/${mainCob.file_id}`);
-        const fdata = await fres.json();
-        document.getElementById("ast-source-filename").textContent = fdata.file_name;
-        document.getElementById("ast-source-code").textContent = fdata.content;
-        document.getElementById("mig-cobol-code").textContent = fdata.content;
+    try {
+      astData = await safeFetchJson(`/api/projects/${currentProjectId}/ast`);
+      const treeDiv = document.getElementById("ast-tree-view");
+      treeDiv.innerHTML = "";
+      if (astData.length === 0) {
+        treeDiv.innerHTML = "<p style='color: var(--text-muted); padding: 16px;'>Analyze project to generate AST.</p>";
+        return;
       }
+
+      astData.forEach(item => {
+        const ast = item.ast;
+        const rootDiv = document.createElement("div");
+        rootDiv.style.marginBottom = "8px";
+        rootDiv.innerHTML = `<span style="color:#60a5fa;font-weight:700;">📁 ${ast.name}</span> <span style="color:var(--text-muted);">(${ast.node_type})</span>`;
+        renderASTChildren(ast, rootDiv, item.file_id);
+        treeDiv.appendChild(rootDiv);
+      });
+    } catch (e) {
+      console.error(e);
     }
   }
 
   function renderASTChildren(node, parentEl, fileId) {
     if (!node.children || node.children.length === 0) return;
     const list = document.createElement("div");
-    list.style.marginLeft = "12px";
-    list.style.borderLeft = "1px solid #e2e8f0";
+    list.style.marginLeft = "14px";
+    list.style.borderLeft = "1px solid rgba(255,255,255,0.08)";
     list.style.paddingLeft = "8px";
 
     node.children.forEach(child => {
       const item = document.createElement("div");
-      item.className = "tree-node";
-      item.innerHTML = `▸ <span class="tree-label">${child.name}</span> <span style="font-size: 11px; color: var(--text-muted);">[L${child.start_line}-${child.end_line}]</span>`;
+      item.style.padding = "3px 0";
+      item.style.cursor = "pointer";
+      item.innerHTML = `▸ <span style="font-weight:600;color:#e2e8f0;">${child.name}</span> <span style="font-size: 10px; color: var(--text-dim);">[L${child.start_line}-${child.end_line}]</span>`;
       item.onclick = (e) => {
         e.stopPropagation();
         highlightSourceLines(child.start_line, child.end_line);
@@ -900,284 +1551,560 @@
 
   function highlightSourceLines(start, end) {
     const box = document.getElementById("ast-source-code");
-    const lines = box.textContent.split("\n");
+    const raw = box.textContent;
+    const lines = raw.split("\n");
     const marked = lines.map((l, idx) => {
       const lineNo = idx + 1;
       if (lineNo >= start && lineNo <= end) {
-        return `> ${l}`;
+        return `>> [${lineNo.toString().padStart(4, ' ')}] ${l.replace(/^>>\s*\[\s*\d+\]\s*/, '')}`;
       }
-      return `  ${l}`;
+      return `   [${lineNo.toString().padStart(4, ' ')}] ${l.replace(/^>>\s*\[\s*\d+\]\s*/, '')}`;
     }).join("\n");
     box.textContent = marked;
   }
 
-  // Interactive Graph Rendering (SVG)
+  // ===================== D3 INTERACTIVE DEPENDENCY GRAPH =====================
   async function renderGraph() {
     if (!currentProjectId) return;
-    const res = await fetch(`/api/projects/${currentProjectId}/graph`);
-    const gdata = await res.json();
-    const svg = document.getElementById("dep-svg");
-    svg.innerHTML = "";
+    try {
+      graphData = await safeFetchJson(`/api/projects/${currentProjectId}/graph`);
+      drawGraphD3(graphData);
+    } catch (e) {
+      console.error("Failed to render graph:", e);
+    }
+  }
 
-    const width = svg.clientWidth || 900;
-    const height = 480;
+  let activeFilter = 'ALL';
+  function filterGraph(type) {
+    activeFilter = type;
+    if (!graphData.nodes) return;
+    let filteredNodes = graphData.nodes;
+    if (type === 'ROUTINES') {
+      filteredNodes = graphData.nodes.filter(n => n.type === 'Program' || n.type === 'Paragraph' || n.type === 'Section');
+    } else if (type === 'VARS') {
+      filteredNodes = graphData.nodes.filter(n => n.type === 'DataItem' || n.type === 'Program');
+    } else if (type === 'COPYBOOKS') {
+      filteredNodes = graphData.nodes.filter(n => n.type === 'Copybook' || n.type === 'Program');
+    }
+    const nodeIds = new Set(filteredNodes.map(n => n.id));
+    const filteredEdges = graphData.edges.filter(e => {
+      const s = typeof e.source === 'object' ? e.source.id : e.source;
+      const t = typeof e.target === 'object' ? e.target.id : e.target;
+      return nodeIds.has(s) && nodeIds.has(t);
+    });
+    drawGraphD3({ nodes: filteredNodes, edges: filteredEdges });
+  }
 
-    // Layout nodes into circular/hierarchical levels
-    const nodeMap = {};
-    const count = gdata.nodes.length;
-    if (count === 0) return;
+  function filterGraphBySearch() {
+    const term = document.getElementById("graph-search-input").value.toLowerCase();
+    d3.selectAll(".graph-node").each(function(d) {
+      const match = d.label.toLowerCase().includes(term);
+      d3.select(this).style("opacity", match || !term ? 1 : 0.15);
+    });
+  }
 
-    gdata.nodes.forEach((n, idx) => {
-      const angle = (idx / count) * 2 * Math.PI;
-      const radius = n.type === 'Program' ? 60 : (n.type === 'Section' ? 120 : (n.type === 'Paragraph' ? 180 : 220));
-      const cx = width / 2 + radius * Math.cos(angle);
-      const cy = height / 2 + radius * Math.sin(angle);
-      nodeMap[n.id] = { ...n, x: cx, y: cy };
+  function drawGraphD3(data) {
+    const svgEl = document.getElementById("dep-svg");
+    const width = svgEl.clientWidth || 900;
+    const height = 560;
+
+    const svg = d3.select("#dep-svg");
+    svg.selectAll("*").remove();
+
+    if (!data.nodes || data.nodes.length === 0) {
+      svg.append("text")
+        .attr("x", width / 2)
+        .attr("y", height / 2)
+        .attr("text-anchor", "middle")
+        .attr("fill", "#64748b")
+        .attr("font-size", "14px")
+        .text("No graph dependencies extracted yet. Ingest COBOL code and analyze project.");
+      return;
+    }
+
+    // Definitions (Arrow Markers)
+    const defs = svg.append("defs");
+    const edgeColors = {
+      'PERFORMS': '#a855f7',
+      'CALLS': '#ec4899',
+      'COPIES': '#10b981',
+      'READS': '#f59e0b',
+      'WRITES': '#f59e0b',
+      'REFERENCES': '#f59e0b',
+      'CONTAINS': '#475569',
+      'DEFINES': '#475569'
+    };
+
+    Object.entries(edgeColors).forEach(([rel, color]) => {
+      defs.append("marker")
+        .attr("id", `arrow-${rel}`)
+        .attr("viewBox", "0 -5 10 10")
+        .attr("refX", 24)
+        .attr("refY", 0)
+        .attr("markerWidth", 6)
+        .attr("markerHeight", 6)
+        .attr("orient", "auto")
+        .append("path")
+        .attr("d", "M0,-5L10,0L0,5")
+        .attr("fill", color);
     });
 
-    // Render Edges
-    gdata.edges.forEach(e => {
-      const s = nodeMap[e.source];
-      const t = nodeMap[e.target];
-      if (s && t) {
-        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
-        line.setAttribute("x1", s.x);
-        line.setAttribute("y1", s.y);
-        line.setAttribute("x2", t.x);
-        line.setAttribute("y2", t.y);
-        line.setAttribute("stroke", "#cbd5e1");
-        line.setAttribute("stroke-width", "1.5");
-        svg.appendChild(line);
-      }
+    const g = svg.append("g").attr("class", "graph-root");
+
+    // Zoom setup
+    svgZoom = d3.zoom()
+      .scaleExtent([0.2, 4])
+      .on("zoom", (event) => {
+        g.attr("transform", event.transform);
+      });
+    svg.call(svgZoom);
+
+    // Deep copy nodes and edges for D3 simulation
+    const nodes = data.nodes.map(d => ({ ...d }));
+    const edges = data.edges.map(d => ({ ...d }));
+
+    simulation = d3.forceSimulation(nodes)
+      .force("link", d3.forceLink(edges).id(d => d.id).distance(d => d.type === 'CONTAINS' ? 80 : 130))
+      .force("charge", d3.forceManyBody().strength(-280))
+      .force("center", d3.forceCenter(width / 2, height / 2))
+      .force("collision", d3.forceCollide().radius(45));
+
+    // Links
+    const link = g.append("g")
+      .attr("class", "links")
+      .selectAll("line")
+      .data(edges)
+      .join("line")
+      .attr("stroke", d => edgeColors[d.type] || "#475569")
+      .attr("stroke-width", 1.8)
+      .attr("stroke-opacity", 0.6)
+      .attr("marker-end", d => `url(#arrow-${d.type})`);
+
+    // Edge Labels
+    const linkText = g.append("g")
+      .attr("class", "link-labels")
+      .selectAll("text")
+      .data(edges)
+      .join("text")
+      .attr("font-size", "9px")
+      .attr("fill", "#94a3b8")
+      .attr("text-anchor", "middle")
+      .attr("opacity", 0.7)
+      .text(d => d.type);
+
+    // Node Groups
+    const node = g.append("g")
+      .attr("class", "nodes")
+      .selectAll("g")
+      .data(nodes)
+      .join("g")
+      .attr("class", "graph-node")
+      .call(d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended));
+
+    // Colors & Badges
+    const nodePalette = {
+      'Program': { fill: '#1d4ed8', stroke: '#3b82f6', icon: '💻' },
+      'Paragraph': { fill: '#6d28d9', stroke: '#8b5cf6', icon: '⚡' },
+      'Copybook': { fill: '#047857', stroke: '#10b981', icon: '📄' },
+      'DataItem': { fill: '#b45309', stroke: '#f59e0b', icon: '📦' },
+      'Section': { fill: '#334155', stroke: '#64748b', icon: '📑' }
+    };
+
+    // Node Background Pill
+    node.append("rect")
+      .attr("rx", 14)
+      .attr("ry", 14)
+      .attr("x", d => -(d.label.length * 4.2 + 20))
+      .attr("y", -14)
+      .attr("width", d => d.label.length * 8.4 + 40)
+      .attr("height", 28)
+      .attr("fill", d => (nodePalette[d.type] || nodePalette['Section']).fill)
+      .attr("stroke", d => (nodePalette[d.type] || nodePalette['Section']).stroke)
+      .attr("stroke-width", 1.8)
+      .attr("cursor", "pointer")
+      .style("filter", "drop-shadow(0 2px 5px rgba(0,0,0,0.5))");
+
+    // Node Text
+    node.append("text")
+      .attr("text-anchor", "middle")
+      .attr("dy", 4)
+      .attr("font-size", "11.5px")
+      .attr("font-weight", "600")
+      .attr("fill", "#ffffff")
+      .attr("pointer-events", "none")
+      .text(d => `${(nodePalette[d.type] || nodePalette['Section']).icon} ${d.label}`);
+
+    // Node Events: Hover Highlight & Drawer Click
+    node.on("mouseover", (event, d) => {
+      const connected = new Set();
+      connected.add(d.id);
+      edges.forEach(e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        if (s === d.id) connected.add(t);
+        if (t === d.id) connected.add(s);
+      });
+
+      node.style("opacity", n => connected.has(n.id) ? 1 : 0.15);
+      link.style("stroke-opacity", e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        return (s === d.id || t === d.id) ? 1 : 0.05;
+      });
+      link.style("stroke-width", e => {
+        const s = typeof e.source === 'object' ? e.source.id : e.source;
+        const t = typeof e.target === 'object' ? e.target.id : e.target;
+        return (s === d.id || t === d.id) ? 2.5 : 1;
+      });
+    }).on("mouseout", () => {
+      node.style("opacity", 1);
+      link.style("stroke-opacity", 0.6);
+      link.style("stroke-width", 1.8);
+    }).on("click", (event, d) => {
+      event.stopPropagation();
+      openNodeDrawer(d, edges);
     });
 
-    // Render Nodes
-    gdata.nodes.forEach(n => {
-      const pos = nodeMap[n.id];
-      if (!pos) return;
-      const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
-      g.style.cursor = "pointer";
+    simulation.on("tick", () => {
+      link
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
 
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", pos.x);
-      circle.setAttribute("cy", pos.y);
-      circle.setAttribute("r", n.type === 'Program' ? "18" : (n.type === 'Paragraph' ? "14" : "10"));
-      
-      let fill = "#2563eb";
-      if (n.type === 'Paragraph') fill = "#7c3aed";
-      if (n.type === 'DataItem') fill = "#ea580c";
-      if (n.type === 'Copybook') fill = "#16a34a";
-      circle.setAttribute("fill", fill);
-      g.appendChild(circle);
+      linkText
+        .attr("x", d => (d.source.x + d.target.x) / 2)
+        .attr("y", d => (d.source.y + d.target.y) / 2 - 3);
 
-      const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
-      text.setAttribute("x", pos.x);
-      text.setAttribute("y", pos.y + 22);
-      text.setAttribute("text-anchor", "middle");
-      text.setAttribute("font-size", "10px");
-      text.setAttribute("font-weight", "600");
-      text.setAttribute("fill", "#1e293b");
-      text.textContent = n.label;
-      g.appendChild(text);
-
-      g.onclick = () => {
-        document.getElementById("graph-node-details").innerHTML = `
-          <strong>Selected Node:</strong> ${n.label} | <strong>Type:</strong> ${n.type} | 
-          <strong>Source Span:</strong> Lines ${n.start_line || 'N/A'}-${n.end_line || 'N/A'}<br>
-          <strong>Properties:</strong> ${JSON.stringify(n.properties)}
-        `;
-      };
-
-      svg.appendChild(g);
+      node.attr("transform", d => `translate(${d.x},${d.y})`);
     });
+
+    function dragstarted(event) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
+    }
+    function dragged(event) {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    }
+    function dragended(event) {
+      if (!event.active) simulation.alphaTarget(0);
+      event.subject.fx = null;
+      event.subject.fy = null;
+    }
+  }
+
+  function zoomGraph(factor) {
+    if (!svgZoom) return;
+    d3.select("#dep-svg").transition().duration(250).call(svgZoom.scaleBy, factor);
+  }
+  function resetGraphView() {
+    if (!svgZoom) return;
+    d3.select("#dep-svg").transition().duration(350).call(svgZoom.transform, d3.zoomIdentity);
+  }
+  function togglePhysics() {
+    if (!simulation) return;
+    if (isPhysicsRunning) {
+      simulation.stop();
+      isPhysicsRunning = false;
+      showToast("Graph physics paused", "info");
+    } else {
+      simulation.restart();
+      isPhysicsRunning = true;
+      showToast("Graph physics resumed", "info");
+    }
+  }
+
+  function openNodeDrawer(node, edges) {
+    const drawer = document.getElementById("graph-drawer");
+    const title = document.getElementById("drawer-title");
+    const content = document.getElementById("drawer-content");
+
+    title.textContent = `${node.type}: ${node.label}`;
+
+    // Find incoming and outgoing edges
+    const outgoing = edges.filter(e => (typeof e.source === 'object' ? e.source.id : e.source) === node.id);
+    const incoming = edges.filter(e => (typeof e.target === 'object' ? e.target.id : e.target) === node.id);
+
+    let html = `
+      <div style="margin-bottom: 10px;">
+        <span class="tag tag-blue">${node.type}</span>
+        ${node.start_line ? `<span class="tag tag-purple">Lines ${node.start_line} - ${node.end_line}</span>` : ''}
+      </div>
+      <div style="margin-bottom: 12px; color: var(--text-muted);">
+        <strong>Node ID:</strong> <span style="color:#f1f5f9;">${node.id}</span>
+      </div>
+    `;
+
+    if (outgoing.length > 0) {
+      html += `<div style="margin-top: 10px; font-weight:700; color:#93c5fd;">Outgoing Relationships (${outgoing.length}):</div><ul style="padding-left:16px;margin-top:4px;">`;
+      outgoing.forEach(e => {
+        const targetLabel = typeof e.target === 'object' ? (e.target.label || e.target.id) : e.target;
+        html += `<li><strong>${e.type}</strong> → ${targetLabel}</li>`;
+      });
+      html += `</ul>`;
+    }
+
+    if (incoming.length > 0) {
+      html += `<div style="margin-top: 10px; font-weight:700; color:#c084fc;">Incoming Callers / References (${incoming.length}):</div><ul style="padding-left:16px;margin-top:4px;">`;
+      incoming.forEach(e => {
+        const sourceLabel = typeof e.source === 'object' ? (e.source.label || e.source.id) : e.source;
+        html += `<li>${sourceLabel} → <strong>${e.type}</strong></li>`;
+      });
+      html += `</ul>`;
+    }
+
+    if (node.properties && Object.keys(node.properties).length > 0) {
+      html += `<div style="margin-top: 12px; font-weight:700; color:#fbbf24;">Properties:</div><pre style="background:#090d16;padding:8px;border-radius:4px;overflow-x:auto;margin-top:4px;font-size:11px;">${JSON.stringify(node.properties, null, 2)}</pre>`;
+    }
+
+    html += `
+      <div style="margin-top: 16px;">
+        <button class="btn btn-secondary" style="width: 100%;" onclick="highlightInSource('${node.start_line}', '${node.end_line}')">Inspect in Source Code</button>
+      </div>
+    `;
+
+    content.innerHTML = html;
+    drawer.classList.add("open");
+  }
+
+  function highlightInSource(start, end) {
+    switchTab("ast");
+    if (start && end) {
+      highlightSourceLines(parseInt(start), parseInt(end));
+    }
+  }
+
+  function closeDrawer() {
+    document.getElementById("graph-drawer").classList.remove("open");
   }
 
   // Hybrid Retrieval
   async function executeHybridRetrieval() {
     if (!currentProjectId) return;
     const query = document.getElementById("retrieval-query-input").value;
-    const res = await fetch(`/api/projects/${currentProjectId}/retrieve?query=${encodeURIComponent(query)}`, { method: "POST" });
-    const data = await res.json();
-    
-    // 1. Vector Results
-    const vdiv = document.getElementById("retrieval-vector-results");
-    vdiv.innerHTML = "";
-    data.inspection.vector_results.forEach(vr => {
-      const card = document.createElement("div");
-      card.style.padding = "8px";
-      card.style.background = "#f1f5f9";
-      card.style.marginBottom = "6px";
-      card.style.borderRadius = "4px";
-      card.innerHTML = `<strong>${vr.symbol}</strong> <span class="tag tag-blue">${(vr.score * 100).toFixed(1)}% match</span>`;
-      vdiv.appendChild(card);
-    });
+    try {
+      const data = await safeFetchJson(`/api/projects/${currentProjectId}/retrieve?query=${encodeURIComponent(query)}`, { method: "POST" });
 
-    // 2. Graph Results
-    const gdiv = document.getElementById("retrieval-graph-results");
-    gdiv.innerHTML = "";
-    data.inspection.graph_expansion_nodes.forEach(gn => {
-      const card = document.createElement("div");
-      card.style.padding = "8px";
-      card.style.background = "#faf5ff";
-      card.style.marginBottom = "6px";
-      card.style.borderRadius = "4px";
-      card.innerHTML = `<strong>+ ${gn.label}</strong> <span class="tag tag-purple">${gn.type}</span>`;
-      gdiv.appendChild(card);
-    });
+      const vdiv = document.getElementById("retrieval-vector-results");
+      vdiv.innerHTML = "";
+      data.inspection.vector_results.forEach(vr => {
+        const card = document.createElement("div");
+        card.style.padding = "8px 12px";
+        card.style.background = "rgba(15, 23, 42, 0.6)";
+        card.style.border = "1px solid var(--border)";
+        card.style.marginBottom = "6px";
+        card.style.borderRadius = "6px";
+        card.innerHTML = `<strong style="color:#60a5fa;">${vr.symbol}</strong> <span class="tag tag-blue" style="float:right;">${(vr.score * 100).toFixed(1)}% match</span>`;
+        vdiv.appendChild(card);
+      });
 
-    // 3. Constraints
-    const cdiv = document.getElementById("retrieval-constraints-results");
-    cdiv.innerHTML = data.structural_constraints.map(c => `• ${c}`).join("<br>");
+      const gdiv = document.getElementById("retrieval-graph-results");
+      gdiv.innerHTML = "";
+      data.inspection.graph_expansion_nodes.forEach(gn => {
+        const card = document.createElement("div");
+        card.style.padding = "8px 12px";
+        card.style.background = "rgba(15, 23, 42, 0.6)";
+        card.style.border = "1px solid var(--border)";
+        card.style.marginBottom = "6px";
+        card.style.borderRadius = "6px";
+        card.innerHTML = `<strong style="color:#c084fc;">+ ${gn.label}</strong> <span class="tag tag-purple" style="float:right;">${gn.type}</span>`;
+        gdiv.appendChild(card);
+      });
+
+      const cdiv = document.getElementById("retrieval-constraints-results");
+      cdiv.innerHTML = data.structural_constraints.map(c => `• ${c}`).join("<br><br>");
+      showToast("Hybrid Context Retrieved!", "success");
+    } catch (e) {
+      showToast("Retrieval failed: " + e.message, "error");
+    }
   }
 
   // Run Migration
   async function runMigration(baseline = false) {
-    if (!currentProjectId) return;
+    if (!currentProjectId) {
+      showToast("Please select a project first", "error");
+      return;
+    }
     const targetName = document.getElementById("mig-target-name").value;
     const targetMode = document.getElementById("mig-target-mode").value;
     const maxRepairs = parseInt(document.getElementById("mig-max-repairs").value) || 3;
 
     setPipelineStep(5, "running");
-    document.getElementById("mig-java-status").textContent = "GENERATING...";
+    setPipelineStep(6, "running");
+    setPipelineStep(7, "running");
+    document.getElementById("mig-java-status").textContent = "GENERATING (GEMINI)...";
+    document.getElementById("mig-java-status").className = "tag tag-blue";
 
-    const res = await fetch(`/api/projects/${currentProjectId}/migrate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        project_id: currentProjectId,
-        target_mode: targetMode,
-        target_name: targetName,
-        max_repair_attempts: maxRepairs,
-        baseline: baseline
-      })
-    });
+    showToast("Starting AST-Guided Migration with Gemini...", "info");
 
-    const data = await res.json();
-    currentMigrationId = data.migration_id;
+    try {
+      const data = await safeFetchJson(`/api/projects/${currentProjectId}/migrate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          project_id: currentProjectId,
+          target_mode: targetMode,
+          target_name: targetName,
+          max_repair_attempts: maxRepairs,
+          baseline: baseline
+        })
+      });
+      currentMigrationId = data.migration_id;
 
-    // Display Java Code
-    if (data.generated_files && data.generated_files.length > 0) {
-      document.getElementById("mig-java-code").textContent = data.generated_files[0].content;
+      // Update Java output
+      if (data.generated_files && data.generated_files.length > 0) {
+        document.getElementById("mig-java-code").textContent = data.generated_files[0].content;
+      }
+      document.getElementById("mig-java-status").textContent = data.final_status;
+      document.getElementById("mig-java-status").className = data.final_status === 'VERIFIED' ? 'tag tag-pass' : 'tag tag-amber';
+
+      setPipelineStep(7, "success");
+      setPipelineStep(8, "success");
+      setPipelineStep(9, "success");
+      setPipelineStep(10, data.total_attempts > 1 ? "running" : "success");
+      setPipelineStep(11, data.final_status === "VERIFIED" ? "success" : "failed");
+
+      // Populate Verification Tab
+      populateVerification(data.verification_report || data, data.attempts || []);
+      showToast(`Migration ${data.final_status}!`, data.final_status === "VERIFIED" ? "success" : "info");
+    } catch (e) {
+      document.getElementById("mig-java-status").textContent = "FAILED";
+      document.getElementById("mig-java-status").className = "tag tag-fail";
+      showToast("Migration error: " + e.message, "error");
     }
-
-    document.getElementById("mig-java-status").textContent = data.final_status;
-    document.getElementById("mig-java-status").className = `tag ${data.final_status === 'VERIFIED' ? 'tag-pass' : 'tag-fail'}`;
-
-    // Update Verification Dashboard
-    document.getElementById("verif-compile-stat").textContent = data.compilation_passed ? "PASS" : "FAIL";
-    document.getElementById("verif-compile-stat").style.color = data.compilation_passed ? "var(--success)" : "var(--danger)";
-
-    document.getElementById("verif-tests-stat").textContent = `${data.tests_passed} / ${data.tests_total}`;
-    document.getElementById("verif-eq-stat").textContent = `${data.equivalence_rate}%`;
-    document.getElementById("verif-repairs-stat").textContent = data.repair_attempts;
-
-    loadVerificationDetails(data.migration_id);
   }
 
-  async function loadVerificationDetails(migId) {
-    const res = await fetch(`/api/migrations/${migId}/verification`);
-    const data = await res.json();
-    const attempts = data.attempts;
+  function populateVerification(verif, attempts) {
+    if (!verif) return;
+    const compilePassed = verif.compilation_passed ?? (verif.compile_status === 'PASS');
+    document.getElementById("verif-compile-stat").textContent = compilePassed ? 'PASS' : 'FAIL';
+    document.getElementById("verif-compile-stat").style.color = compilePassed ? '#34d399' : '#fb7185';
+
+    const passed = verif.passed_tests ?? verif.functional_tests_passed ?? verif.tests_passed ?? 0;
+    const total = verif.total_tests ?? verif.total_functional_tests ?? verif.tests_total ?? 0;
+    document.getElementById("verif-tests-stat").textContent = `${passed} / ${total}`;
+    
+    const eqRate = verif.equivalence_rate != null ? `${verif.equivalence_rate}%` : (verif.functional_equivalence ? "100%" : "FAIL");
+    document.getElementById("verif-eq-stat").textContent = eqRate;
+    document.getElementById("verif-repairs-stat").textContent = (attempts && attempts.length > 0) ? attempts.length : (verif.repair_attempts || 0);
 
     const tbody = document.getElementById("test-results-tbody");
     tbody.innerHTML = "";
+    
+    let testList = verif.test_results || [];
+    if (testList.length === 0 && attempts && attempts.length > 0) {
+      testList = attempts[attempts.length - 1].test_results || [];
+    }
 
-    const lastAtt = attempts[attempts.length - 1];
-    if (lastAtt && lastAtt.tests_passed !== undefined) {
-      // Simulate test items for the table
-      const statuses = [
-        { id: "TC_01_STANDARD_BASE", type: "standard", in: "GROSS=150.00", cob: "TOTAL=154.00", jav: "TOTAL=154.00", st: "PASS" },
-        { id: "TC_02_VIP_DISCOUNT", type: "standard", in: "GROSS=200.00, STATUS=VIP", cob: "TOTAL=194.40", jav: "TOTAL=194.40", st: "PASS" },
-        { id: "TC_03_ZERO_AMOUNT", type: "boundary", in: "GROSS=0.00", cob: "TOTAL=0.00", jav: "TOTAL=0.00", st: "PASS" },
-        { id: "TC_04_DISCOUNT_THRESHOLD_BELOW", type: "boundary", in: "GROSS=99.99, STATUS=VIP", cob: "TOTAL=107.99", jav: "TOTAL=107.99", st: "PASS" },
-        { id: "TC_05_DISCOUNT_THRESHOLD_EXACT", type: "boundary", in: "GROSS=100.00, STATUS=VIP", cob: "TOTAL=97.20", jav: "TOTAL=97.20", st: "PASS" }
-      ];
-
-      statuses.forEach(s => {
+    if (testList && testList.length > 0) {
+      testList.forEach(t => {
         const tr = document.createElement("tr");
+        const cobolOut = typeof t.cobol_output === 'object' ? JSON.stringify(t.cobol_output) : (t.cobol_output ?? '-');
+        const javaOut = typeof t.java_output === 'object' ? JSON.stringify(t.java_output) : (t.java_output ?? '-');
         tr.innerHTML = `
-          <td style="font-weight: 600;">${s.id}</td>
-          <td><span class="tag tag-blue">${s.type}</span></td>
-          <td><code>${s.in}</code></td>
-          <td><code>${s.cob}</code></td>
-          <td><code>${s.jav}</code></td>
-          <td><span class="tag tag-pass">${s.st}</span></td>
-          <td>0.8 ms</td>
+          <td style="font-family:var(--font-mono);font-weight:700;">${t.test_id}</td>
+          <td><span class="tag tag-blue">${t.source_type || 'BOUNDARY'}</span></td>
+          <td style="font-family:var(--font-mono);font-size:11px;">${JSON.stringify(t.input_data || {})}</td>
+          <td style="font-family:var(--font-mono);color:#34d399;">${cobolOut}</td>
+          <td style="font-family:var(--font-mono);color:#60a5fa;">${javaOut}</td>
+          <td><span class="tag ${t.status === 'PASS' ? 'tag-pass' : 'tag-fail'}">${t.status}</span></td>
+          <td style="color:var(--text-muted);">${(t.execution_time_ms || 0.8).toFixed(1)} ms</td>
         `;
         tbody.appendChild(tr);
       });
     }
 
-    // Repair Timeline
     const tline = document.getElementById("repair-timeline");
     tline.innerHTML = "";
-    attempts.forEach(a => {
-      const card = document.createElement("div");
-      card.style.padding = "10px";
-      card.style.border = "1px solid var(--border)";
-      card.style.borderRadius = "6px";
-      card.style.marginBottom = "8px";
-      card.innerHTML = `
-        <strong>Attempt #${a.attempt_number}</strong>: 
-        <span class="tag ${a.compile_status === 'PASS' ? 'tag-pass' : 'tag-fail'}">Compile: ${a.compile_status}</span>
-        <span class="tag tag-purple">Tests: ${a.tests_passed}/${a.tests_total}</span>
-        <div style="font-size: 11px; color: var(--text-muted); margin-top: 4px;">${a.diagnosis || 'Verification complete.'}</div>
-      `;
-      tline.appendChild(card);
-    });
+    if (attempts && attempts.length > 0) {
+      attempts.forEach(a => {
+        const card = document.createElement("div");
+        card.style.padding = "12px";
+        card.style.background = "rgba(15, 23, 42, 0.6)";
+        card.style.border = "1px solid var(--border)";
+        card.style.borderRadius = "8px";
+        card.style.marginBottom = "8px";
+        card.innerHTML = `
+          <strong>Attempt #${a.attempt_number}</strong>: 
+          <span class="tag ${a.compile_status === 'PASS' ? 'tag-pass' : 'tag-fail'}">Compile: ${a.compile_status}</span>
+          <span class="tag tag-purple">Tests: ${a.tests_passed}/${a.tests_total}</span>
+          <div style="font-size: 11px; color: var(--text-muted); margin-top: 6px;">${a.diagnosis || 'Differential tests matched.'}</div>
+        `;
+        tline.appendChild(card);
+      });
+    }
   }
 
   // Capability Matrix
   async function loadCapabilityMatrix() {
-    const res = await fetch("/api/capability-matrix");
-    const data = await res.json();
-    const tbody = document.getElementById("capability-tbody");
-    tbody.innerHTML = "";
-    data.forEach(c => {
-      const tr = document.createElement("tr");
-      let tagClass = "tag-pass";
-      if (c.status === "PARTIAL") tagClass = "tag-orange";
-      if (c.status === "UNSUPPORTED") tagClass = "tag-fail";
-      tr.innerHTML = `
-        <td style="font-weight: 700;">${c.feature}</td>
-        <td><span class="tag ${tagClass}">${c.status}</span></td>
-        <td>${c.description}</td>
-      `;
-      tbody.appendChild(tr);
-    });
+    try {
+      const data = await safeFetchJson("/api/capability-matrix");
+      const tbody = document.getElementById("capability-tbody");
+      tbody.innerHTML = "";
+      data.forEach(c => {
+        const tr = document.createElement("tr");
+        let tagClass = "tag-pass";
+        if (c.status === "PARTIAL") tagClass = "tag-amber";
+        if (c.status === "UNSUPPORTED") tagClass = "tag-fail";
+        tr.innerHTML = `
+          <td style="font-weight: 700; font-family: var(--font-mono); color: #f1f5f9;">${c.feature}</td>
+          <td><span class="tag ${tagClass}">${c.status}</span></td>
+          <td style="color: #cbd5e1;">${c.description}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   // Benchmark Run
   async function runBenchmark() {
     if (!currentProjectId) return;
-    const res = await fetch(`/api/benchmark/run?project_id=${currentProjectId}`, { method: "POST" });
-    const bdata = await res.json();
-    
-    document.getElementById("bm-base-compile").textContent = bdata.baseline.compile_success ? "PASS" : "FAIL";
-    document.getElementById("bm-prop-compile").textContent = bdata.proposed.compile_success ? "PASS" : "FAIL";
+    showToast("Executing Empirical Evaluation against Baseline...", "info");
+    try {
+      const bdata = await safeFetchJson(`/api/benchmark/run?project_id=${currentProjectId}`, { method: "POST" });
+      
+      document.getElementById("bm-base-compile").textContent = bdata.baseline.compile_success ? "100%" : "0%";
+      document.getElementById("bm-prop-compile").textContent = bdata.proposed.compile_success ? "100%" : "0%";
 
-    document.getElementById("bm-base-pass").textContent = `${bdata.baseline.test_pass_rate}%`;
-    document.getElementById("bm-prop-pass").textContent = `${bdata.proposed.test_pass_rate}%`;
+      document.getElementById("bm-base-pass").textContent = `${bdata.baseline.test_pass_rate}%`;
+      document.getElementById("bm-prop-pass").textContent = `${bdata.proposed.test_pass_rate}%`;
 
-    document.getElementById("bm-base-eq").textContent = bdata.baseline.functional_equivalence ? "VERIFIED" : "FAILED";
-    document.getElementById("bm-base-eq").className = `tag ${bdata.baseline.functional_equivalence ? 'tag-pass' : 'tag-fail'}`;
+      document.getElementById("bm-base-eq").textContent = bdata.baseline.functional_equivalence ? "VERIFIED" : "FAILED";
+      document.getElementById("bm-base-eq").className = `tag ${bdata.baseline.functional_equivalence ? 'tag-pass' : 'tag-fail'}`;
 
-    document.getElementById("bm-prop-eq").textContent = bdata.proposed.functional_equivalence ? "VERIFIED" : "FAILED";
-    document.getElementById("bm-prop-eq").className = `tag ${bdata.proposed.functional_equivalence ? 'tag-pass' : 'tag-fail'}`;
+      document.getElementById("bm-prop-eq").textContent = bdata.proposed.functional_equivalence ? "VERIFIED" : "FAILED";
+      document.getElementById("bm-prop-eq").className = `tag ${bdata.proposed.functional_equivalence ? 'tag-pass' : 'tag-fail'}`;
 
-    document.getElementById("bm-base-dep").textContent = `${bdata.baseline.dependency_failures} (Omitted Rules)`;
-    document.getElementById("bm-prop-dep").textContent = `${bdata.proposed.dependency_failures}`;
+      document.getElementById("bm-base-dep").textContent = `${bdata.baseline.dependency_failures} (Omitted Rules)`;
+      document.getElementById("bm-prop-dep").textContent = `${bdata.proposed.dependency_failures}`;
 
-    document.getElementById("bm-base-ret").textContent = `${bdata.baseline.retrieval_latency_ms} ms`;
-    document.getElementById("bm-prop-ret").textContent = `${bdata.proposed.retrieval_latency_ms} ms`;
+      document.getElementById("bm-base-ret").textContent = `${bdata.baseline.retrieval_latency_ms} ms`;
+      document.getElementById("bm-prop-ret").textContent = `${bdata.proposed.retrieval_latency_ms} ms`;
 
-    document.getElementById("bm-base-repair").textContent = `${bdata.baseline.repair_attempts}`;
-    document.getElementById("bm-prop-repair").textContent = `${bdata.proposed.repair_attempts}`;
+      document.getElementById("bm-base-repair").textContent = `${bdata.baseline.repair_attempts}`;
+      document.getElementById("bm-prop-repair").textContent = `${bdata.proposed.repair_attempts}`;
+      showToast("Benchmark evaluation completed!", "success");
+    } catch (e) {
+      showToast("Benchmark failed: " + e.message, "error");
+    }
+  }
+
+  function copyCode(elementId) {
+    const text = document.getElementById(elementId).textContent;
+    navigator.clipboard.writeText(text);
+    showToast("Copied to clipboard!", "success");
   }
 
   function downloadJavaZip() {
     if (!currentMigrationId) {
-      alert("Please run a migration first!");
+      showToast("Please run a migration first to export Java files", "error");
       return;
     }
     window.location.href = `/api/migrations/${currentMigrationId}/export`;
@@ -1200,7 +2127,8 @@
     };
   }
 
-  // Init
+  // Initial Boot
+  loadTemplateCode();
   loadProjects();
 </script>
 

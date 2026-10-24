@@ -10,7 +10,7 @@ class ASTNode(BaseModel):
     details: Dict[str, Any] = {}
     children: List['ASTNode'] = []
 
-ASTNode.update_forward_refs()
+ASTNode.model_rebuild()
 
 class ChunkInfo(BaseModel):
     chunk_id: str

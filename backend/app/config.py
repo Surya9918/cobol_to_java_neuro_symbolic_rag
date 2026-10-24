@@ -14,8 +14,7 @@ def load_dotenv():
                 if line and not line.startswith("#") and "=" in line:
                     k, v = line.split("=", 1)
                     k, v = k.strip(), v.strip()
-                    if k not in os.environ:
-                        os.environ[k] = v
+                    os.environ[k] = v
 
 load_dotenv()
 
@@ -24,10 +23,10 @@ class Settings(BaseModel):
     workspace_dir: Path = WORKSPACE_DIR
     
     # LLM Settings
-    llm_provider: str = Field(default_factory=lambda: os.getenv("LLM_PROVIDER", "local"))
+    llm_provider: str = Field(default_factory=lambda: os.getenv("LLM_PROVIDER", "gemini"))
     llm_api_key: str = Field(default_factory=lambda: os.getenv("LLM_API_KEY", ""))
-    llm_model: str = Field(default_factory=lambda: os.getenv("LLM_MODEL", "gpt-4o"))
-    llm_base_url: str = Field(default_factory=lambda: os.getenv("LLM_BASE_URL", "https://api.openai.com/v1"))
+    llm_model: str = Field(default_factory=lambda: os.getenv("LLM_MODEL", "gemini-3.5-flash"))
+    llm_base_url: str = Field(default_factory=lambda: os.getenv("LLM_BASE_URL", "https://generativelanguage.googleapis.com/v1beta"))
     
     # Embedding Settings
     embedding_provider: str = Field(default_factory=lambda: os.getenv("EMBEDDING_PROVIDER", "local"))
@@ -49,7 +48,7 @@ class Settings(BaseModel):
     numeric_tolerance: float = Field(default_factory=lambda: float(os.getenv("NUMERIC_TOLERANCE", "0.001")))
     
     # Compilers / Runtimes
-    java_home: str = Field(default_factory=lambda: os.getenv("JAVA_HOME", "/usr/lib/jvm/java-17-openjdk-amd64"))
+    java_home: str = Field(default_factory=lambda: os.getenv("JAVA_HOME", r"C:\Program Files\Android\Android Studio\jbr" if os.path.exists(r"C:\Program Files\Android\Android Studio\jbr") else "/usr/lib/jvm/java-17-openjdk-amd64"))
     cobol_compiler: str = Field(default_factory=lambda: os.getenv("COBOL_COMPILER", "builtin"))
     
     # Server

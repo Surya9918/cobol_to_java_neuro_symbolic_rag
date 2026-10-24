@@ -4,8 +4,11 @@ import json
 import os
 import shutil
 import zipfile
+import logging
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+
+logger = logging.getLogger(__name__)
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -142,6 +145,40 @@ def get_file_content(project_id: str, file_id: str):
         raise HTTPException(status_code=404, detail="File not found")
     return dict(row)
 
+from pydantic import BaseModel as PyBaseModel
+
+class PasteCodeRequest(PyBaseModel):
+    file_name: str = "MYPROGRAM.cob"
+    content: str
+    file_type: str = "SOURCE"
+
+@app.post("/api/projects/{project_id}/paste-code")
+def paste_code(project_id: str, req: PasteCodeRequest):
+    actual_type = "COPYBOOK" if req.file_name.lower().endswith((".cpy", ".copy")) or req.file_type == "COPYBOOK" else "SOURCE"
+    fid = workspace_mgr.save_file(project_id, req.file_name, req.content, actual_type)
+    return {"file_id": fid, "file_name": req.file_name, "file_type": actual_type, "status": "SAVED"}
+
+@app.delete("/api/projects/{project_id}/files/{file_id}")
+def delete_file(project_id: str, file_id: str):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT file_path FROM files WHERE project_id = ? AND file_id = ?", (project_id, file_id))
+    row = cursor.fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="File not found")
+    fpath = Path(row["file_path"])
+    if fpath.exists():
+        try:
+            fpath.unlink()
+        except Exception:
+            pass
+    cursor.execute("DELETE FROM files WHERE project_id = ? AND file_id = ?", (project_id, file_id))
+    cursor.execute("DELETE FROM chunks WHERE project_id = ? AND file_id = ?", (project_id, file_id))
+    conn.commit()
+    conn.close()
+    return {"status": "DELETED", "file_id": file_id}
+
 # ----------------- ANALYSIS & INDEXING -----------------
 
 @app.post("/api/projects/{project_id}/analyze")
@@ -214,103 +251,132 @@ async def migrate_code(project_id: str, req: MigrationRequest):
     migration_id = f"mig_{uuid.uuid4().hex[:10]}"
     pdir = workspace_mgr.get_project_dir(project_id)
 
-    # 1. Retrieval
-    await emit_pipeline_event(project_id, 5, "Retrieval", "RUNNING", f"Retrieving context for {req.target_name}...")
-    cb_resolver = CopybookResolver([pdir / "copybooks", pdir / "source"])
-    query_str = req.query or req.target_name
-    bundle = retriever.retrieve(
-        project_id=project_id,
-        query=query_str,
-        top_k=req.top_k,
-        graph_hops=req.graph_hops,
-        copybook_resolver=cb_resolver,
-        baseline=req.baseline
-    )
-    await emit_pipeline_event(project_id, 5, "Retrieval", "SUCCESS", f"Found {len(bundle.primary_chunks)} primary chunks, {len(bundle.dependency_chunks)} graph dependencies.")
-
-    # 2. Context Assembly
-    await emit_pipeline_event(project_id, 6, "Context Assembly", "RUNNING", "Assembling prompt and structural constraints...")
-    prompt = TranslationPromptBuilder.build_prompt(
-        project_name=project_id,
-        target_name=req.target_name,
-        context=bundle,
-        baseline=req.baseline
-    )
-    await emit_pipeline_event(project_id, 6, "Context Assembly", "SUCCESS", f"Context assembled with {len(bundle.structural_constraints)} constraints.")
-
-    # 3. Java Generation
-    await emit_pipeline_event(project_id, 7, "Java Generation", "RUNNING", "Generating target Java code...")
-    trans_res = translator.translate(prompt)
-    await emit_pipeline_event(project_id, 7, "Java Generation", "SUCCESS", f"Generated Java class {trans_res['entry_point']}.")
-
-    # 4. Verification & Repair Loop
-    await emit_pipeline_event(project_id, 8, "Compilation", "RUNNING", "Validating Java compilation...")
-    await emit_pipeline_event(project_id, 9, "Differential Testing", "RUNNING", "Executing original COBOL vs Java on test suites...")
-
+    # Pre-insert migration record to satisfy foreign key constraints for attempts table
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT content FROM files WHERE project_id = ? AND file_type = 'SOURCE' LIMIT 1", (project_id,))
-    row = cursor.fetchone()
-    cobol_source = row["content"] if row else ""
-
-    repair_orchestrator = RepairLoopOrchestrator(
-        project_id=project_id,
-        migration_id=migration_id,
-        workspace_dir=pdir,
-        translation_service=translator,
-        max_attempts=req.max_repair_attempts
-    )
-
-    verif_report: VerificationReport = repair_orchestrator.execute_verification_and_repair(
-        target_name=req.target_name,
-        context=bundle,
-        initial_files=trans_res["files"],
-        entry_point=trans_res["entry_point"],
-        cobol_source=cobol_source,
-        baseline=req.baseline
-    )
-
-    if verif_report.total_repair_attempts > 1:
-        await emit_pipeline_event(project_id, 10, "Repair", "SUCCESS", f"Completed {verif_report.total_repair_attempts - 1} repair attempts.")
-
-    final_msg = "Functional verification PASS (100% equivalence)." if verif_report.final_status == "VERIFIED" else "Verification FAILED."
-    await emit_pipeline_event(project_id, 11, "Final Verification", "SUCCESS" if verif_report.final_status == "VERIFIED" else "FAILED", final_msg)
-
-    # Persist Migration
-    total_time = (time.time() - t_start) * 1000.0
     cursor.execute(
         """
         INSERT INTO migrations
-        (migration_id, project_id, target_mode, target_name, query, status, retrieval_context, generated_code, final_status, total_attempts, metrics)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (migration_id, project_id, target_mode, target_name, query, status)
+        VALUES (?, ?, ?, ?, ?, 'RUNNING')
         """,
-        (
-            migration_id, project_id, req.target_mode, req.target_name, req.query,
-            verif_report.final_status, json.dumps(bundle.inspection.dict()),
-            trans_res["files"][0].content if trans_res["files"] else "",
-            verif_report.final_status, verif_report.total_repair_attempts,
-            json.dumps({"total_time_ms": total_time, "equivalence_rate": verif_report.equivalence_rate})
-        )
+        (migration_id, project_id, req.target_mode, req.target_name, req.query)
     )
     conn.commit()
     conn.close()
 
-    return MigrationResponse(
-        migration_id=migration_id,
-        project_id=project_id,
-        target_mode=req.target_mode,
-        target_name=req.target_name,
-        status=verif_report.final_status,
-        retrieval=bundle.inspection,
-        generated_files=trans_res["files"],
-        compilation_passed=verif_report.compilation_passed,
-        tests_total=verif_report.total_tests,
-        tests_passed=verif_report.passed_tests,
-        equivalence_rate=verif_report.equivalence_rate,
-        repair_attempts=verif_report.total_repair_attempts,
-        final_status=verif_report.final_status,
-        metrics={"total_time_ms": round(total_time, 2)}
-    )
+    try:
+        # 1. Retrieval
+        await emit_pipeline_event(project_id, 5, "Retrieval", "RUNNING", f"Retrieving context for {req.target_name}...")
+        cb_resolver = CopybookResolver([pdir / "copybooks", pdir / "source"])
+        query_str = req.query or req.target_name
+        bundle = retriever.retrieve(
+            project_id=project_id,
+            query=query_str,
+            top_k=req.top_k,
+            graph_hops=req.graph_hops,
+            copybook_resolver=cb_resolver,
+            baseline=req.baseline
+        )
+        await emit_pipeline_event(project_id, 5, "Retrieval", "SUCCESS", f"Found {len(bundle.primary_chunks)} primary chunks, {len(bundle.dependency_chunks)} graph dependencies.")
+
+        # 2. Context Assembly
+        await emit_pipeline_event(project_id, 6, "Context Assembly", "RUNNING", "Assembling prompt and structural constraints...")
+        prompt = TranslationPromptBuilder.build_prompt(
+            project_name=project_id,
+            target_name=req.target_name,
+            context=bundle,
+            baseline=req.baseline
+        )
+        await emit_pipeline_event(project_id, 6, "Context Assembly", "SUCCESS", f"Context assembled with {len(bundle.structural_constraints)} constraints.")
+
+        # 3. Java Generation
+        await emit_pipeline_event(project_id, 7, "Java Generation", "RUNNING", "Generating target Java code with Gemini...")
+        trans_res = translator.translate(prompt)
+        await emit_pipeline_event(project_id, 7, "Java Generation", "SUCCESS", f"Generated Java class {trans_res['entry_point']}.")
+
+        # 4. Verification & Repair Loop
+        await emit_pipeline_event(project_id, 8, "Compilation", "RUNNING", "Validating Java compilation...")
+        await emit_pipeline_event(project_id, 9, "Differential Testing", "RUNNING", "Executing original COBOL vs Java on test suites...")
+
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT content FROM files WHERE project_id = ? AND file_type = 'SOURCE' LIMIT 1", (project_id,))
+        row = cursor.fetchone()
+        cobol_source = row["content"] if row else ""
+
+        repair_orchestrator = RepairLoopOrchestrator(
+            project_id=project_id,
+            migration_id=migration_id,
+            workspace_dir=pdir,
+            translation_service=translator,
+            max_attempts=req.max_repair_attempts
+        )
+
+        verif_report: VerificationReport = repair_orchestrator.execute_verification_and_repair(
+            target_name=req.target_name,
+            context=bundle,
+            initial_files=trans_res["files"],
+            entry_point=trans_res["entry_point"],
+            cobol_source=cobol_source,
+            baseline=req.baseline
+        )
+
+        if verif_report.total_repair_attempts > 1:
+            await emit_pipeline_event(project_id, 10, "Repair", "SUCCESS", f"Completed {verif_report.total_repair_attempts - 1} repair attempts.")
+
+        final_msg = "Functional verification PASS (100% equivalence)." if verif_report.final_status == "VERIFIED" else "Verification FAILED."
+        await emit_pipeline_event(project_id, 11, "Final Verification", "SUCCESS" if verif_report.final_status == "VERIFIED" else "FAILED", final_msg)
+
+        # Update Persisted Migration
+        total_time = (time.time() - t_start) * 1000.0
+        cursor.execute(
+            """
+            UPDATE migrations
+            SET status = ?, retrieval_context = ?, generated_code = ?, final_status = ?, total_attempts = ?, metrics = ?, updated_at = CURRENT_TIMESTAMP
+            WHERE migration_id = ?
+            """,
+            (
+                verif_report.final_status, json.dumps(bundle.inspection.model_dump() if hasattr(bundle.inspection, "model_dump") else bundle.inspection.dict()),
+                trans_res["files"][0].content if trans_res["files"] else "",
+                verif_report.final_status, verif_report.total_repair_attempts,
+                json.dumps({"total_time_ms": total_time, "equivalence_rate": verif_report.equivalence_rate}),
+                migration_id
+            )
+        )
+        conn.commit()
+        conn.close()
+
+        verif_dict = verif_report.model_dump() if hasattr(verif_report, "model_dump") else verif_report.dict()
+        return MigrationResponse(
+            migration_id=migration_id,
+            project_id=project_id,
+            target_mode=req.target_mode,
+            target_name=req.target_name,
+            status=verif_report.final_status,
+            retrieval=bundle.inspection,
+            generated_files=trans_res["files"],
+            compilation_passed=verif_report.compilation_passed,
+            tests_total=verif_report.total_tests,
+            tests_passed=verif_report.passed_tests,
+            equivalence_rate=verif_report.equivalence_rate,
+            repair_attempts=verif_report.total_repair_attempts,
+            final_status=verif_report.final_status,
+            metrics={"total_time_ms": round(total_time, 2)},
+            attempts=verif_dict.get("attempts_history", []),
+            verification_report=verif_dict
+        )
+    except Exception as e:
+        logger.exception(f"Migration error for project {project_id}: {e}")
+        await emit_pipeline_event(project_id, 11, "Final Verification", "FAILED", f"Migration error: {str(e)}")
+        try:
+            conn = get_connection()
+            conn.execute("UPDATE migrations SET status = 'FAILED', final_status = 'FAILED' WHERE migration_id = ?", (migration_id,))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/migrations/{migration_id}/verification")
 def get_migration_verification(migration_id: str):

@@ -194,25 +194,36 @@ class RepairLoopOrchestrator:
     def _persist_attempt(self, attempt: RepairAttemptSchema):
         conn = get_connection()
         cursor = conn.cursor()
-        cursor.execute(
-            """
-            INSERT OR REPLACE INTO attempts
-            (attempt_id, migration_id, attempt_number, generated_code, compile_status, compile_errors, tests_passed, tests_total, status, failure_category, diagnosis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                attempt.attempt_id,
-                self.migration_id,
-                attempt.attempt_number,
-                attempt.generated_code,
-                attempt.compile_status,
-                attempt.compile_errors,
-                attempt.tests_passed,
-                attempt.tests_total,
-                attempt.status,
-                attempt.failure_category,
-                attempt.diagnosis
+        try:
+            # Ensure parent project exists
+            cursor.execute("INSERT OR IGNORE INTO projects (project_id, name) VALUES (?, ?)", (self.project_id, self.project_id))
+            # Ensure parent migration exists
+            cursor.execute(
+                "INSERT OR IGNORE INTO migrations (migration_id, project_id, target_mode, target_name, status) VALUES (?, ?, 'PROGRAM', 'TARGET', 'RUNNING')",
+                (self.migration_id, self.project_id)
             )
-        )
-        conn.commit()
-        conn.close()
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO attempts
+                (attempt_id, migration_id, attempt_number, generated_code, compile_status, compile_errors, tests_passed, tests_total, status, failure_category, diagnosis)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    attempt.attempt_id,
+                    self.migration_id,
+                    attempt.attempt_number,
+                    attempt.generated_code,
+                    attempt.compile_status,
+                    attempt.compile_errors,
+                    attempt.tests_passed,
+                    attempt.tests_total,
+                    attempt.status,
+                    attempt.failure_category,
+                    attempt.diagnosis
+                )
+            )
+            conn.commit()
+        except Exception as e:
+            logger.error(f"Error persisting attempt {attempt.attempt_id}: {e}")
+        finally:
+            conn.close()

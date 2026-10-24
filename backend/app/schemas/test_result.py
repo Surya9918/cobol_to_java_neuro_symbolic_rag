@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Any
 from pydantic import BaseModel, Field
 
 class TestCaseSchema(BaseModel):
+    __test__ = False
     test_id: str
     module_name: str
     source_type: str # 'boundary' | 'fuzz' | 'existing' | 'symbolic_planned'
@@ -9,6 +10,7 @@ class TestCaseSchema(BaseModel):
     expected_output: Optional[Dict[str, Any]] = None
 
 class TestResultSchema(BaseModel):
+    __test__ = False
     test_id: str
     input_data: Dict[str, Any]
     cobol_output: Optional[Dict[str, Any]] = None

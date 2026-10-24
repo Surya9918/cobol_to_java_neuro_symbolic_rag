@@ -37,6 +37,13 @@ class TestHybridRetrieval(unittest.TestCase):
         self.retriever = HybridRetriever(self.wm.vector_store, self.wm.graph_store)
 
     def tearDown(self):
+        from backend.app.db.database import get_connection
+        conn = get_connection()
+        conn.execute("DELETE FROM projects WHERE project_id = ?", (self.proj_id,))
+        conn.execute("DELETE FROM files WHERE project_id = ?", (self.proj_id,))
+        conn.execute("DELETE FROM chunks WHERE project_id = ?", (self.proj_id,))
+        conn.commit()
+        conn.close()
         self.tmpdir.cleanup()
 
     def test_neuro_symbolic_retrieval_recovers_graph_dependencies(self):

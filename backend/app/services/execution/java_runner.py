@@ -13,7 +13,25 @@ class JavaRunner:
     """
     def __init__(self, java_home: Optional[str] = None):
         self.java_home = java_home or settings.java_home
-        self.java_bin = f"{self.java_home}/bin/java" if os.path.exists(f"{self.java_home}/bin/java") else "java"
+        resolved_bin = "java"
+        candidates = []
+        if self.java_home:
+            candidates.extend([
+                os.path.join(self.java_home, "bin", "java.exe"),
+                os.path.join(self.java_home, "bin", "java")
+            ])
+        candidates.extend(["java.exe", "java"])
+
+        import shutil
+        for candidate in candidates:
+            if os.path.isabs(candidate) and os.path.exists(candidate):
+                resolved_bin = candidate
+                break
+            found = shutil.which(candidate)
+            if found:
+                resolved_bin = found
+                break
+        self.java_bin = resolved_bin
 
     def execute(self, project_dir: Path, class_name: str, input_data: Dict[str, Any]) -> Dict[str, Any]:
         target_source = project_dir / "src" / "main" / "java" / "com" / "migration" / f"{class_name}.java"

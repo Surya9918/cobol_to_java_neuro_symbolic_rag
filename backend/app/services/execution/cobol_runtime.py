@@ -42,10 +42,14 @@ class CobolRuntimeEngine:
 
     def _init_variable(self, item: DataItemNode):
         var_name = item.name.upper()
+        raw = str(item.value).strip("'\" ") if item.value is not None else ""
         if item.data_type in ("NUMERIC", "DECIMAL"):
-            val = Decimal(str(item.value)) if item.value is not None else Decimal("0.00")
+            try:
+                val = Decimal(raw) if raw else Decimal("0.00")
+            except (InvalidOperation, ValueError):
+                val = raw if raw else Decimal("0.00")
         else:
-            val = item.value if item.value is not None else ""
+            val = raw
         self.variables[var_name] = val
 
     def _eval_operand(self, token: str) -> Any:

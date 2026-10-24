@@ -40,3 +40,5 @@ class MigrationResponse(BaseModel):
     repair_attempts: int = 0
     final_status: str
     metrics: Dict[str, Any] = {}
+    attempts: List[Any] = []
+    verification_report: Optional[Dict[str, Any]] = None

@@ -6,7 +6,7 @@ from backend.app.config import settings
 from backend.app.providers.base import LLMProvider, LLMResponse
 from backend.app.providers.openai_provider import OpenAICompatibleProvider
 from backend.app.providers.anthropic_provider import AnthropicProvider
-from backend.app.providers.local_provider import LocalModelProvider
+from backend.app.providers.gemini_provider import GeminiProvider
 from backend.app.schemas.migration import GeneratedFile
 
 logger = logging.getLogger(__name__)
@@ -21,12 +21,19 @@ class TranslationService:
             self.provider = provider
         else:
             p_name = settings.llm_provider.lower()
-            if p_name in ('openai', 'azure', 'vllm') and settings.llm_api_key:
+            if p_name in ('gemini', 'google') and settings.llm_api_key:
+                self.provider = GeminiProvider()
+            elif p_name in ('openai', 'azure', 'vllm') and settings.llm_api_key:
                 self.provider = OpenAICompatibleProvider()
             elif p_name in ('anthropic', 'claude') and settings.llm_api_key:
                 self.provider = AnthropicProvider()
+            elif settings.llm_api_key and settings.llm_api_key.startswith("AQ."):
+                self.provider = GeminiProvider()
             else:
-                self.provider = LocalModelProvider()
+                raise RuntimeError(
+                    f"Production LLM Error: No valid cloud LLM credentials found for provider '{settings.llm_provider}'. "
+                    "Please ensure LLM_API_KEY is configured in your environment."
+                )
 
     def translate(self, prompt: str) -> Dict[str, Any]:
         response: LLMResponse = self.provider.generate(prompt)
@@ -35,6 +42,10 @@ class TranslationService:
         # Extract JSON from markdown fences if present
         json_match = re.search(r'```(?:json)?\s*([\s\S]*?)```', raw_text)
         json_str = json_match.group(1).strip() if json_match else raw_text
+        if json_str.startswith("json\n"):
+            json_str = json_str[5:].strip()
+        elif json_str.startswith("json"):
+            json_str = json_str[4:].strip()
 
         try:
             data = json.loads(json_str)
@@ -53,9 +64,13 @@ class TranslationService:
         # Standardize files list
         files = []
         for f in data.get("files", []):
+            content = f.get("content", "")
+            if content.startswith("```"):
+                content = re.sub(r'^```(?:java)?\s*', '', content)
+                content = re.sub(r'\s*```$', '', content)
             files.append(GeneratedFile(
                 path=f.get("path", "MigratedProgram.java"),
-                content=f.get("content", "")
+                content=content
             ))
 
         return {

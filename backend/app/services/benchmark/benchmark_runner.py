@@ -21,10 +21,10 @@ class BenchmarkRunner:
     Proposed (AST-guided / Vector + Graph Hybrid / Constrained / Verification / Repair).
     Records latency, compile rate, equivalence rate, and dependency failures.
     """
-    def __init__(self, workspace_manager: WorkspaceManager):
+    def __init__(self, workspace_manager: WorkspaceManager, translator: Optional[TranslationService] = None):
         self.wm = workspace_manager
         self.retriever = HybridRetriever(self.wm.vector_store, self.wm.graph_store)
-        self.translator = TranslationService()
+        self.translator = translator or TranslationService()
 
     def _ensure_migration_record(self, migration_id: str, project_id: str, target_name: str, query: str):
         conn = get_connection()

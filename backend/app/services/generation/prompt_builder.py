@@ -60,10 +60,11 @@ class TranslationPromptBuilder:
         # 5. Translation & Verification Rules
         prompt_parts.append("\n### 5. TARGET JAVA REQUIREMENTS:")
         prompt_parts.append("- Use package: `package com.migration;`")
+        prompt_parts.append("- Use ONLY standard Java SE libraries (`java.math.*`, `java.util.*`, `java.lang.*`). Do NOT import external third-party libraries (no Jackson, Gson, or external libraries).")
         prompt_parts.append("- Use `java.math.BigDecimal` with RoundingMode.HALF_UP for fixed-point decimal arithmetic.")
-        prompt_parts.append("- Implement a `public Map<String, Object> execute(Map<String, Object> input)` method for testability.")
+        prompt_parts.append("- Implement `public Map<String, Object> execute(Map<String, Object> input)` returning the computed state variables.")
+        prompt_parts.append("- In `public static void main(String[] args)`: parse CLI args key=value into input Map, call execute(input), print delimiter line `___RESULT_JSON___` and the JSON string of result.")
         prompt_parts.append("- Preserve exact calculation order and conditional branching.")
-        prompt_parts.append("- Provide a standard `main(String[] args)` method.")
         prompt_parts.append("- Never invent missing dependencies or omit unsupported constructs silently.")
 
         # 6. Repair feedback if applicable
